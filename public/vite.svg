@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d4aa"/>
+      <stop offset="100%" style="stop-color:#00a86b"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="45" fill="none" stroke="url(#g1)" stroke-width="4"/>
+  <text x="50" y="38" text-anchor="middle" font-family="Inter, sans-serif" font-weight="800" font-size="18" fill="url(#g1)">AURA</text>
+  <text x="50" y="55" text-anchor="middle" font-family="Inter, sans-serif" font-weight="400" font-size="7" fill="#94a3b8">CO₂ &amp; kW</text>
+  <path d="M30 68 Q50 58 70 68" stroke="url(#g1)" stroke-width="2" fill="none"/>
+</svg>
