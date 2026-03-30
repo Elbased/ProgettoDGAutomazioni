@@ -39,7 +39,23 @@ ZephyrusTech e una piattaforma prototipale che unisce sensori ambientali e monit
 - TypeScript
 - Three.js
 - Chart.js
+## Avvio
 
+Windows (CMD o PowerShell):
+```bat
+.\avvio.bat
+```
+
+PowerShell (anche su macOS/Linux se installato):
+```powershell
+pwsh ./avvio.ps1
+```
+
+macOS/Linux (bash):
+```bash
+chmod +x ./avvio.sh
+./avvio.sh
+```
 ## Note
 
 I dati e i grafici sono simulati a scopo dimostrativo.
