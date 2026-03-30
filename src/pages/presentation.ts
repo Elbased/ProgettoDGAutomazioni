@@ -1,243 +1,284 @@
 ﻿// ===== Presentation Page =====
-import { createBarChart, createDoughnutChart, createLineChart } from '../utils/charts';
+import { createBarChart, createDoughnutChart, createLineChart, updateBarChart, updateDoughnutChart, updateLineChart } from '../utils/charts';
+
+let presentationInterval: number | null = null;
 
 export function renderPresentation(container: HTMLElement): void {
+  if (presentationInterval) {
+    clearInterval(presentationInterval);
+    presentationInterval = null;
+  }
   container.innerHTML = `
-    <div class="container">
-      <div class="page-header">
-        <h1><span class="material-symbols-rounded">campaign</span> Presentazione Progetto</h1>
-        <p class="subtitle">Panoramica professionale del sistema di monitoraggio energetico e qualità dell'aria per ambienti scolastici.</p>
-        <p class="intro-note">Zephyrus è il nome del vento di ponente nella mitologia greca: una brezza leggera e pulita. Il progetto adotta questo simbolo per rappresentare aria sana, monitoraggio costante e benessere negli ambienti scolastici.</p>
-      </div>
-
-      <section class="hero-grid">
-        <div class="hero-card">
-          <div class="eyebrow">ZephyrusTech</div>
-          <h2>Monitoraggio intelligente, decisioni rapide.</h2>
-          <p>
-            Raccogliamo dati ambientali e di consumo in aula, li analizziamo su un server centrale e li trasformiamo
-            in grafici chiari per preside, responsabili e docenti. Il risultato è una gestione più efficiente,
-            trasparente e pronta alla crescita.
+    <div class="container landing">
+      <section class="hero reveal warp-item">
+        <div class="hero-content">
+          <div class="hero-badge">ZephyrusTech · Benessere e risparmio per le scuole</div>
+          <h1 class="hero-title">Aria più sana e consumi sotto controllo, in un’unica piattaforma.</h1>
+          <p class="hero-subtitle">
+            Un prodotto semplice da usare che aiuta scuole e docenti a capire subito
+            se l’aula è in equilibrio e dove intervenire.
           </p>
           <div class="hero-actions">
-            <a class="btn primary" href="#simulation">Apri la simulazione</a>
-            <a class="btn" href="#schematic">Vedi lo schema</a>
+            <a class="btn primary" href="#simulation">Avvia demo live</a>
+            <a class="btn ghost" href="#components">Vedi il kit</a>
           </div>
-          <div class="hero-footnote">Dati e grafici mostrati a scopo dimostrativo.</div>
-        </div>
-
-        <div class="kpi-grid">
-          <div class="kpi-card">
-            <div class="kpi-label">Campionamento</div>
-            <div class="kpi-value">ogni 5 s</div>
-            <div class="kpi-desc">Dati aggiornati in tempo quasi reale.</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Setup per aula</div>
-            <div class="kpi-value">2–3 ore</div>
-            <div class="kpi-desc">Installazione, calibrazione e test.</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Costo BOM</div>
-            <div class="kpi-value">€28,42</div>
-            <div class="kpi-desc">Kit completo con componenti online.</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Stima per classe</div>
-            <div class="kpi-value">€16,37</div>
-            <div class="kpi-desc">Acquisto in lotto e ottimizzazione.</div>
+          <div class="hero-proof">
+            <div class="proof-item"><span class="proof-label">Aggiornamento</span><span class="proof-value">Ogni pochi secondi</span></div>
+            <div class="proof-item"><span class="proof-label">Installazione</span><span class="proof-value">Rapida</span></div>
+            <div class="proof-item"><span class="proof-label">Costo kit</span><span class="proof-value">Accessibile</span></div>
           </div>
         </div>
-      </section>
-
-      <section class="card" style="margin-top: var(--sp-xl);">
-        <div class="card-title"><span class="material-symbols-rounded icon-sm">hub</span> Flusso Dati</div>
-        <div class="flow-grid">
-          <div class="flow-step">
-            <span class="material-symbols-rounded icon-lg">sensors</span>
-            <h3>Rilevazione</h3>
-            <p>MQ-135 e SCT-013 misurano qualità aria e consumo senza interventi invasivi.</p>
-          </div>
-          <div class="flow-step">
-            <span class="material-symbols-rounded icon-lg">memory</span>
-            <h3>Elaborazione</h3>
-            <p>ESP32-C3 filtra i dati, applica soglie e prepara i pacchetti per l'invio.</p>
-          </div>
-          <div class="flow-step">
-            <span class="material-symbols-rounded icon-lg">dns</span>
-            <h3>Server Centrale</h3>
-            <p>Validazione, storicizzazione e trasformazione in grafici e report.</p>
-          </div>
-          <div class="flow-step">
-            <span class="material-symbols-rounded icon-lg">monitoring</span>
-            <h3>Dashboard</h3>
-            <p>Accesso differenziato: amministratore e utenti con sola visualizzazione.</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="grid-2" style="margin-top: var(--sp-lg);">
-        <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">shield_person</span> Gestione e Ruoli</div>
-          <div class="role-grid">
-            <div class="role-card">
-              <div class="role-title">Amministratore</div>
-              <ul class="simple-list">
-                <li>Aggiunge o rimuove centraline e stanze.</li>
-                <li>Imposta soglie, scenari e profili di aula.</li>
-                <li>Gestisce report, esportazioni e storico.</li>
-              </ul>
-            </div>
-            <div class="role-card">
-              <div class="role-title">Utenti (docenti/studenti)</div>
-              <ul class="simple-list">
-                <li>Accesso in sola visualizzazione.</li>
-                <li>Grafici, stato aula e alert in tempo reale.</li>
-                <li>Confronto tra aule e periodi.</li>
-              </ul>
+        <div class="hero-card">
+          <div class="hero-card-top">
+            <img src="/Logo.png" alt="ZephyrusTech logo">
+            <div>
+              <div class="hero-card-title">Dashboard Operativa</div>
+              <div class="hero-card-sub">Stato aula in tempo reale</div>
             </div>
           </div>
-        </div>
-
-        <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">workspaces</span> Esempi di Applicazione</div>
-          <ul class="simple-list">
-            <li>Aule standard e laboratori informatici.</li>
-            <li>Biblioteche, sale studio e auditorium.</li>
-            <li>Palestre e spazi polifunzionali con alta variabilità.</li>
-            <li>Controllo consumi in periodi di chiusura.</li>
-          </ul>
-          <div class="section-note">Compatibile con espansioni future (sensori aggiuntivi e nuove stanze).</div>
+          <div class="hero-metrics">
+            <div class="metric">
+              <div class="metric-label">Qualità aria</div>
+              <div class="metric-value">Ottima</div>
+              <div class="metric-note ok">Stabile</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Consumo</div>
+              <div class="metric-value">In linea</div>
+              <div class="metric-note ok">Stabile</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Allarmi attivi</div>
+              <div class="metric-value">0</div>
+              <div class="metric-note muted">Ultimi 60 min</div>
+            </div>
+          </div>
+          <div class="hero-card-footer">
+            Sistema scalabile per aule, laboratori e palestre.
+          </div>
         </div>
       </section>
 
-      <section class="grid-2" style="margin-top: var(--sp-lg);">
-        <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">show_chart</span> Qualità Aria (CO₂ eq · lezione tipo)</div>
-          <div class="chart-container">
-            <canvas id="chart-air"></canvas>
-          </div>
-          <div class="section-note">Valori simulati con andamento realistico (CO₂ equivalente da MQ-135).</div>
+      <section class="value-grid reveal delay-1 warp-item">
+        <div class="value-card">
+          <div class="value-title">Riduzione rischi</div>
+          <div class="value-text">Avvisi chiari quando serve intervenire, senza tecnicismi.</div>
         </div>
-        <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">insights</span> Consumo per Fascia Oraria</div>
-          <div class="chart-container">
-            <canvas id="chart-energy"></canvas>
-          </div>
-          <div class="section-note">Esempio di carico medio giornaliero per aula.</div>
+        <div class="value-card">
+          <div class="value-title">Decisioni rapide</div>
+          <div class="value-text">Grafici semplici e leggibili anche in pochi minuti.</div>
+        </div>
+        <div class="value-card">
+          <div class="value-title">Costi controllati</div>
+          <div class="value-text">Installazione veloce e manutenzione leggera.</div>
         </div>
       </section>
 
-      <section class="grid-2" style="margin-top: var(--sp-lg);">
-        <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">donut_large</span> Ripartizione Costi BOM</div>
-          <div class="chart-container">
-            <canvas id="chart-costs"></canvas>
+      <section class="section-split reveal delay-2 warp-item">
+        <div class="section-copy">
+          <div class="section-label">Come funziona</div>
+          <h2 class="section-title">Misura, capisci, agisci.</h2>
+          <p class="section-text">
+            Piccoli sensori raccolgono le informazioni dell’aula, il sistema le riassume
+            in indicatori chiari e ti guida nelle azioni.
+          </p>
+          <div class="step-list">
+            <div class="step-item"><span class="step-num">01</span> Rilevazione qualità aria e consumi</div>
+            <div class="step-item"><span class="step-num">02</span> Valutazione automatica</div>
+            <div class="step-item"><span class="step-num">03</span> Dashboard con alert chiari</div>
           </div>
-          <div class="section-note">Costi indicativi con kit completo e prototipazione inclusa.</div>
         </div>
-        <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">schedule</span> Tempi e Prezzi di Setup</div>
+        <div class="section-media">
+          <div class="panel-mock">
+            <div class="panel-row">
+              <span>Stato aula</span><strong>Ottimo</strong>
+            </div>
+            <div class="panel-row">
+              <span>Qualità aria</span><strong>In equilibrio</strong>
+            </div>
+            <div class="panel-row">
+              <span>Consumo</span><strong>Sotto controllo</strong>
+            </div>
+            <div class="panel-row subtle">
+              <span>Ultimo intervento</span><strong>—</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-split reverse reveal delay-3 warp-item">
+        <div class="section-copy">
+          <div class="section-label">Valore per la scuola</div>
+          <h2 class="section-title">Una piattaforma pronta per crescere.</h2>
+          <p class="section-text">
+            Accesso da browser, ruoli chiari e possibilità di aggiungere nuove aule nel tempo.
+          </p>
+          <div class="feature-grid">
+            <div class="feature">Dashboard con indicatori chiari</div>
+            <div class="feature">Simulazione 3D per demo</div>
+            <div class="feature">Storico dati per confronti</div>
+            <div class="feature">Aggiornamenti semplici</div>
+          </div>
+        </div>
+        <div class="section-media">
+          <div class="panel-mock">
+            <div class="panel-row">
+              <span>Qualità aria</span><strong>OK</strong>
+            </div>
+            <div class="panel-row">
+              <span>Consumo</span><strong>495 W</strong>
+            </div>
+            <div class="panel-row">
+              <span>Stato sistema</span><strong>Stabile</strong>
+            </div>
+            <div class="panel-row subtle">
+              <span>Ultimo alert</span><strong>—</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-data reveal delay-4 warp-item">
+        <div class="section-label">Dati in tempo reale</div>
+        <h2 class="section-title">Trend chiari e facili da leggere.</h2>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title"><span class="material-symbols-rounded icon-sm">show_chart</span> Qualità Aria</div>
+            <div class="chart-container">
+              <canvas id="chart-air"></canvas>
+            </div>
+            <div class="section-note">Indicatore sintetico con andamento naturale.</div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="material-symbols-rounded icon-sm">insights</span> Consumo Energetico</div>
+            <div class="chart-container">
+              <canvas id="chart-energy"></canvas>
+            </div>
+            <div class="section-note">Andamento giornaliero semplificato.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-split compact reveal delay-5 warp-item">
+        <div class="section-copy">
+          <div class="section-label">Costo e implementazione</div>
+          <h2 class="section-title">Tempo e budget sotto controllo.</h2>
           <div class="timeline">
             <div class="timeline-item">
-              <div class="timeline-title">Sopralluogo e pianificazione</div>
-              <div class="timeline-date">0,5 giornata</div>
-              <div class="timeline-desc">Raccolta requisiti, mappa stanze, definizione soglie.</div>
-            </div>
-            <div class="timeline-item">
-              <div class="timeline-title">Installazione e cablaggio</div>
+              <div class="timeline-title">Installazione</div>
               <div class="timeline-date">1–1,5 ore / aula</div>
-              <div class="timeline-desc">Montaggio sensori, fissaggi e collegamenti.</div>
+              <div class="timeline-desc">Montaggio sensori e cablaggio.</div>
             </div>
             <div class="timeline-item">
-              <div class="timeline-title">Calibrazione e test</div>
-              <div class="timeline-date">30–45 minuti / aula</div>
-              <div class="timeline-desc">Verifica letture e stabilizzazione sensori.</div>
+              <div class="timeline-title">Calibrazione</div>
+              <div class="timeline-date">30–45 minuti</div>
+              <div class="timeline-desc">Verifica letture e stabilizzazione.</div>
             </div>
             <div class="timeline-item">
-              <div class="timeline-title">Formazione rapida</div>
+              <div class="timeline-title">Formazione</div>
               <div class="timeline-date">45–60 minuti</div>
               <div class="timeline-desc">Uso dashboard e gestione alert.</div>
             </div>
           </div>
         </div>
-      </section>
-
-      <section class="grid-2" style="margin-top: var(--sp-lg);">
-        <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">build</span> Manutenzione & Ricambi</div>
-          <ul class="simple-list">
-            <li>Ricalibrazione MQ-135: ogni 6–12 mesi.</li>
-            <li>Sostituzione sensore MQ-135: 12–24 mesi (stima).</li>
-            <li>Controllo cablaggi e fissaggi: 1 volta/anno.</li>
-            <li>Budget ricambi: 5–8% del BOM/anno (uso scolastico).</li>
-          </ul>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">receipt_long</span> Costi Operativi (stima)</div>
-          <ul class="simple-list">
-            <li>Setup iniziale: 2–3 ore per aula, 1 tecnico.</li>
-            <li>Formazione: 45–60 minuti per personale.</li>
-            <li>Supporto annuale: 1–2 interventi brevi.</li>
-          </ul>
-          <div class="section-note">Valori indicativi, variabili per numero di aule e configurazione.</div>
+        <div class="section-media">
+          <div class="card">
+            <div class="card-title"><span class="material-symbols-rounded icon-sm">donut_large</span> Ripartizione Costi BOM</div>
+            <div class="chart-container">
+              <canvas id="chart-costs"></canvas>
+            </div>
+            <div class="section-note">Costi indicativi con kit completo.</div>
+          </div>
         </div>
       </section>
 
-      <section class="grid-2" style="margin-top: var(--sp-lg);">
-        <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">verified</span> Trasparenza e Strumenti</div>
-          <ul class="simple-list">
-            <li>Frontend prototipo: Vite, TypeScript, Three.js, Chart.js.</li>
-            <li>Rendering dati: simulazione real-time con soglie e alert.</li>
-            <li>Server dati (proposto): API REST/MQTT, database storico e dashboard web.</li>
-            <li>Firmware: Arduino IDE / PlatformIO con ESP32-C3.</li>
-            <li>Sensore MQ-135: misura qualità aria e CO₂ equivalente (non NDIR).</li>
-          </ul>
+      <section class="cta reveal delay-5 warp-item">
+        <div>
+          <h2 class="cta-title">Pronti a portare ZephyrusTech nella vostra scuola?</h2>
+          <p class="cta-text">Demo live e dettagli chiari per una valutazione immediata.</p>
         </div>
-        <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">public</span> Mobilità e Compatibilità</div>
-          <ul class="simple-list">
-            <li>Accesso via browser su PC, tablet e smartphone.</li>
-            <li>Hardware modulare con I2C, analogico e I2S.</li>
-            <li>Espansione rapida con nuove centraline e sensori.</li>
-            <li>Compatibile con aggiornamenti futuri via WiFi.</li>
-          </ul>
+        <div class="cta-actions">
+          <a class="btn primary" href="#simulation">Apri demo</a>
+          <a class="btn ghost" href="#arduino">Confronto tecnico</a>
         </div>
       </section>
     </div>
   `;
 
-  const airLabels = ['08:00', '08:20', '08:40', '09:00', '09:20', '09:40', '10:00', '10:20', '10:40', '11:00'];
-  const airValues = [450, 520, 640, 780, 980, 1180, 1320, 1100, 860, 600];
+  const buildTimeLabels = (count: number): string[] => {
+    const labels: string[] = [];
+    const now = Date.now();
+    for (let i = count - 1; i >= 0; i--) {
+      const t = new Date(now - i * 60000);
+      labels.push(t.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }));
+    }
+    return labels;
+  };
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+  const jitter = (v: number, range: number, min: number, max: number) =>
+    clamp(v + (Math.random() * range * 2 - range), min, max);
 
+  let airLabels = buildTimeLabels(10);
+  let airValues = [52, 55, 58, 63, 70, 78, 74, 66, 60, 56];
+  let energyLabels = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00'];
+  let energyValues = [28, 46, 64, 55, 38, 30];
+  let costValues = [32, 24, 18, 16, 10];
+
+  const airRange = () => {
+    const min = Math.min(...airValues);
+    const max = Math.max(...airValues);
+    const pad = Math.max(4, (max - min) * 0.25);
+    return { yMin: clamp(min - pad, 0, 100), yMax: clamp(max + pad, 0, 100) };
+  };
+
+  const range = airRange();
   createLineChart({
     canvasId: 'chart-air',
     labels: airLabels,
     datasets: [{
-      label: 'CO₂ equivalente (ppm)',
+      label: 'Qualità aria',
       data: airValues,
-      color: 'hsl(210, 45%, 45%)',
-      threshold: 1000,
+      color: 'hsl(24, 55%, 42%)',
+      threshold: 75,
+      tension: 0.55,
+      pointRadius: 0,
+      fill: true,
+      gradient: { from: 'rgba(222, 148, 82, 0.35)', to: 'rgba(222, 148, 82, 0.02)' },
+      cubicInterpolationMode: 'monotone',
     }],
-    yLabel: 'ppm',
-    yMin: 350,
-    yMax: 1600,
+    legend: { position: 'top', align: 'start', padding: 10, fontSize: 10, boxWidth: 8 },
+    yLabel: 'Indice',
+    yMin: range.yMin,
+    yMax: range.yMax,
   });
-
+  
   createBarChart(
     'chart-energy',
-    ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00'],
-    [[160, 520, 780, 620, 320, 190]],
-    ['Consumo medio (W)'],
-    ['hsl(206, 45%, 45%)']
+    energyLabels,
+    [energyValues],
+    ['Consumo medio'],
+    ['hsl(30, 45%, 38%)']
   );
 
   createDoughnutChart(
     'chart-costs',
-    ['Controller', 'Sensori', 'Display', 'Audio', 'Passivi/PCB'],
-    [1.65, 5.59, 3.53, 1.29, 8.2],
-    ['hsl(210,45%,45%)', 'hsl(38,70%,50%)', 'hsl(200,55%,55%)', 'hsl(0,60%,55%)', 'hsl(210,10%,60%)']
+    ['Sensori', 'Controller', 'Display', 'Rete', 'Altro'],
+    costValues,
+    ['hsl(24,55%,42%)', 'hsl(30,45%,38%)', 'hsl(38,70%,50%)', 'hsl(20,30%,45%)', 'hsl(25,10%,55%)']
   );
+
+  presentationInterval = window.setInterval(() => {
+    airLabels = [...airLabels.slice(1), new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })];
+    const lastAir = airValues[airValues.length - 1];
+    airValues = [...airValues.slice(1), jitter(lastAir, 4, 45, 88)];
+    const nextRange = airRange();
+    updateLineChart('chart-air', airLabels, [{ data: airValues, threshold: 75 }], { yMin: nextRange.yMin, yMax: nextRange.yMax });
+
+    energyValues = energyValues.map(v => jitter(v, 6, 20, 75));
+    updateBarChart('chart-energy', [energyValues]);
+
+    costValues = costValues.map((v, i) => jitter(v, i === 0 ? 1.2 : 0.8, 8, 36));
+    updateDoughnutChart('chart-costs', costValues);
+  }, 3200);
 }
 

@@ -17,7 +17,7 @@
 
 ## Panoramica
 
-ZephyrusTech e una piattaforma prototipale che unisce sensori ambientali e monitoraggio energetico per offrire una vista chiara e immediata dello stato delle aule. I dati vengono raccolti in tempo quasi reale, filtrati, inviati a un server centrale e trasformati in grafici e avvisi.
+ZephyrusTech e una piattaforma prototipale che unisce sensori ambientali e monitoraggio energetico per offrire una vista chiara e immediata dello stato delle aule.
 
 ## Funzionalita Principali
 
@@ -27,8 +27,7 @@ ZephyrusTech e una piattaforma prototipale che unisce sensori ambientali e monit
 - Dashboard con grafici, soglie e alert
 - Sezione componenti con schede e dettagli tecnici
 - Schemi elettrici consultabili in alta risoluzione
-- Confronto Arduino vs soluzioni custom
-- Architettura pronta per espansioni future
+- Confronto Arduino vs soluzioni custom e architettura espandibile
 
 ## Anteprima Visiva
 
@@ -41,29 +40,8 @@ ZephyrusTech e una piattaforma prototipale che unisce sensori ambientali e monit
 - Three.js
 - Chart.js
 
-## Avvio Rapido
-
-```bash
-npm install
-npm run dev
-```
-
-## Struttura Progetto
-
-```text
-public/
-  Logo.png
-  schemi/
-  componenti/
-src/
-  pages/
-  utils/
-```
-
 ## Note
 
 I dati e i grafici sono simulati a scopo dimostrativo.
 
 ---
-
-Se vuoi, posso aggiungere una sezione Deploy e badge CI quando avremo un workflow.

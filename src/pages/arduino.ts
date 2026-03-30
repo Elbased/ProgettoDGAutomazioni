@@ -46,6 +46,8 @@ export function renderArduino(container: HTMLElement): void {
   const arduinoProd = ARDUINO_BOM.filter(i => !PRODUCTION_EXCLUDE.includes(i.name));
   const esp32ProdTotal = esp32Prod.reduce((acc, i) => acc + i.price, 0);
   const arduinoProdTotal = arduinoProd.reduce((acc, i) => acc + i.price, 0);
+  const savingsProto = arduinoTotal - esp32Total;
+  const savingsProd = arduinoProdTotal - esp32ProdTotal;
 
   container.innerHTML = `
     <div class="container">
@@ -118,238 +120,24 @@ export function renderArduino(container: HTMLElement): void {
 
       <div class="grid-2" style="margin-bottom: var(--sp-lg);">
         <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">receipt_long</span> BOM Arduino (stima)</div>
-          <div class="table-container">
-            <table>
-              <thead><tr><th>Componente</th><th>Prezzo</th></tr></thead>
-              <tbody>
-                ${ARDUINO_BOM.map(item => `
-                  <tr><td>${item.name}</td><td class="price">€${item.price.toFixed(2).replace('.', ',')}</td></tr>
-                `).join('')}
-                <tr style="border-top:2px solid var(--accent);">
-                  <td><strong>TOTALE</strong></td>
-                  <td class="price" style="font-size:1.1rem;"><strong>€${arduinoTotal.toFixed(2).replace('.', ',')}</strong></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="section-note">Valore indicativo con componenti equivalenti.</div>
+          <div class="card-title"><span class="material-symbols-rounded icon-sm">receipt_long</span> Costi Arduino (stima)</div>
+          <div class="spec-row"><span class="spec-key">Prototipo</span><span class="spec-val">€${arduinoTotal.toFixed(2).replace('.', ',')}</span></div>
+          <div class="spec-row"><span class="spec-key">Produzione</span><span class="spec-val">€${arduinoProdTotal.toFixed(2).replace('.', ',')}</span></div>
+          <div class="section-note">Valori indicativi con componenti equivalenti.</div>
         </div>
         <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">receipt_long</span> BOM ESP32-C3</div>
-          <div class="table-container">
-            <table>
-              <thead><tr><th>Componente</th><th>Prezzo</th></tr></thead>
-              <tbody>
-                ${ESP32_BOM.map(item => `
-                  <tr><td>${item.name}</td><td class="price">€${item.price.toFixed(2).replace('.', ',')}</td></tr>
-                `).join('')}
-                <tr style="border-top:2px solid var(--accent);">
-                  <td><strong>TOTALE</strong></td>
-                  <td class="price" style="font-size:1.1rem;"><strong>€${esp32Total.toFixed(2).replace('.', ',')}</strong></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="section-note">BOM completo con componenti online.</div>
-        </div>
-      </div>
-
-      <div class="grid-2" style="margin-bottom: var(--sp-lg);">
-        <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">factory</span> BOM Produzione Arduino (senza prototipo)</div>
-          <div class="table-container">
-            <table>
-              <thead><tr><th>Componente</th><th>Prezzo</th></tr></thead>
-              <tbody>
-                ${arduinoProd.map(item => `
-                  <tr><td>${item.name}</td><td class="price">€${item.price.toFixed(2).replace('.', ',')}</td></tr>
-                `).join('')}
-                <tr style="border-top:2px solid var(--accent);">
-                  <td><strong>TOTALE</strong></td>
-                  <td class="price" style="font-size:1.1rem;"><strong>€${arduinoProdTotal.toFixed(2).replace('.', ',')}</strong></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="section-note">In produzione, breadboard e jumper vengono sostituiti da PCB.</div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="material-symbols-rounded icon-sm">factory</span> BOM Produzione ESP32-C3 (ottimizzata)</div>
-          <div class="table-container">
-            <table>
-              <thead><tr><th>Componente</th><th>Prezzo</th></tr></thead>
-              <tbody>
-                ${esp32Prod.map(item => `
-                  <tr><td>${item.name}</td><td class="price">€${item.price.toFixed(2).replace('.', ',')}</td></tr>
-                `).join('')}
-                <tr style="border-top:2px solid var(--accent);">
-                  <td><strong>TOTALE</strong></td>
-                  <td class="price" style="font-size:1.1rem;"><strong>€${esp32ProdTotal.toFixed(2).replace('.', ',')}</strong></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="section-note">BOM più efficiente, solo componenti necessari.</div>
+          <div class="card-title"><span class="material-symbols-rounded icon-sm">receipt_long</span> Costi ESP32-C3 (stima)</div>
+          <div class="spec-row"><span class="spec-key">Prototipo</span><span class="spec-val">€${esp32Total.toFixed(2).replace('.', ',')}</span></div>
+          <div class="spec-row"><span class="spec-key">Produzione</span><span class="spec-val">€${esp32ProdTotal.toFixed(2).replace('.', ',')}</span></div>
+          <div class="section-note">BOM ottimizzata per efficienza.</div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-title"><span class="material-symbols-rounded icon-sm">code</span> Firmware ESP32-C3 (NTP + soglie)</div>
-        <pre class="code-block code-pre"><span class="macro">#include</span> <span class="string">&lt;WiFi.h&gt;</span>
-<span class="macro">#include</span> <span class="string">&lt;NTPClient.h&gt;</span>
-<span class="macro">#include</span> <span class="string">&lt;WiFiUdp.h&gt;</span>
-<span class="macro">#include</span> <span class="string">&lt;U8g2lib.h&gt;</span>
-
-<span class="comment">// --- CONFIGURAZIONE ---</span>
-<span class="keyword">const</span> <span class="type">char</span>* SSID = <span class="string">&quot;NOME_WIFI&quot;</span>;
-<span class="keyword">const</span> <span class="type">char</span>* PASS = <span class="string">&quot;PASSWORD_WIFI&quot;</span>;
-
-<span class="comment">// PINOUT (Ottimizzato per ESP32 DevKit V1)</span>
-<span class="macro">#define</span> <span class="constant">PIN_CO2</span>      <span class="number">34</span>  <span class="comment">// Analogico</span>
-<span class="macro">#define</span> <span class="constant">PIN_CORRENTE</span> <span class="number">35</span>  <span class="comment">// Analogico</span>
-<span class="macro">#define</span> <span class="constant">PIN_LED</span>      <span class="number">13</span>  <span class="comment">// Digitale</span>
-<span class="macro">#define</span> <span class="constant">PIN_SPEAKER</span>  <span class="number">18</span>  <span class="comment">// PWM</span>
-
-<span class="comment">// PARAMETRI SOGLIA</span>
-<span class="keyword">const</span> <span class="type">int</span> <span class="constant">LIMITE_CO2</span>   = <span class="number">1100</span>;    <span class="comment">// ppm</span>
-<span class="keyword">const</span> <span class="type">int</span> <span class="constant">LIMITE_WATT</span>  = <span class="number">150</span>;     <span class="comment">// Watt</span>
-<span class="keyword">const</span> <span class="type">int</span> <span class="constant">SEC_OVERLOAD</span> = <span class="number">60</span>;      <span class="comment">// Tempo tolleranza sovraccarico</span>
-
-<span class="comment">// GESTIONE TEMPO</span>
-<span class="type">WiFiUDP</span> ntpUDP;
-<span class="type">NTPClient</span> timeClient(ntpUDP, <span class="string">&quot;europe.pool.ntp.org&quot;</span>, <span class="number">3600</span>, <span class="number">60000</span>);
-<span class="keyword">const</span> <span class="type">int</span> <span class="constant">ORA_APERTURA</span> = <span class="number">8</span>;
-<span class="keyword">const</span> <span class="type">int</span> <span class="constant">ORA_CHIUSURA</span> = <span class="number">14</span>;
-
-<span class="comment">// DISPLAY (SH1106 128x64 I2C)</span>
-<span class="type">U8G2_SH1106_128X64_NONAME_F_HW_I2C</span> u8g2(U8G2_R0, U8X8_PIN_NONE);
-
-<span class="comment">// VARIABILI DI STATO</span>
-<span class="type">unsigned long</span> timerInvio = <span class="number">0</span>;
-<span class="type">unsigned long</span> inizioSogliaWatt = <span class="number">0</span>;
-<span class="type">bool</span> allarmeAttivo = <span class="constant">false</span>;
-
-<span class="type">void</span> <span class="function">setup</span>() {
-  Serial.<span class="function">begin</span>(<span class="number">115200</span>);
-  u8g2.<span class="function">begin</span>();
-  <span class="function">pinMode</span>(<span class="constant">PIN_LED</span>, OUTPUT);
-  <span class="function">pinMode</span>(<span class="constant">PIN_SPEAKER</span>, OUTPUT);
-
-  <span class="function">connettiWiFi</span>();
-  timeClient.<span class="function">begin</span>();
-}
-
-<span class="type">void</span> <span class="function">loop</span>() {
-  timeClient.<span class="function">update</span>();
-  <span class="type">int</span> oraAttuale = timeClient.<span class="function">getHours</span>();
-
-  <span class="comment">// CONTROLLO ORARIO SCOLASTICO</span>
-  <span class="keyword">if</span> (oraAttuale &gt;= <span class="constant">ORA_APERTURA</span> &amp;&amp; oraAttuale &lt; <span class="constant">ORA_CHIUSURA</span>) {
-    <span class="function">cicloLavoro</span>();
-  } <span class="keyword">else</span> {
-    <span class="function">gestisciRiposo</span>();
-  }
-}
-
-<span class="comment">// --- LOGICA PRINCIPALE ---</span>
-<span class="type">void</span> <span class="function">cicloLavoro</span>() {
-  <span class="comment">// Lettura e normalizzazione (es. media di 10 campionamenti)</span>
-  <span class="type">int</span> co2 = <span class="function">analogRead</span>(<span class="constant">PIN_CO2</span>);
-  <span class="type">float</span> watt = <span class="function">leggiConsumo</span>();
-
-  <span class="type">bool</span> alertCO2 = (co2 &gt; <span class="constant">LIMITE_CO2</span>);
-  <span class="type">bool</span> alertWatt = <span class="function">falsoAllarmeWatt</span>(watt);
-
-  <span class="comment">// GESTIONE OUTPUT</span>
-  <span class="keyword">if</span> (alertCO2 || alertWatt) {
-    <span class="function">attivaSicurezza</span>(alertCO2, alertWatt, co2, watt);
-  } <span class="keyword">else</span> {
-    <span class="function">disattivaSicurezza</span>();
-    <span class="function">aggiornaDisplay</span>(<span class="string">&quot;SISTEMA OK&quot;</span>, co2, watt);
-  }
-
-  <span class="comment">// INVIO DATI (Ogni 10 secondi)</span>
-  <span class="keyword">if</span> (millis() - timerInvio &gt; <span class="number">10000</span>) {
-    Serial.<span class="function">printf</span>(<span class="string">&quot;LOG: CO2 %d ppm - Consumo %.1f W\\n&quot;</span>, co2, watt);
-    <span class="comment">// Qui andrà la chiamata HTTP verso Abdel</span>
-    timerInvio = <span class="function">millis</span>();
-  }
-}
-
-<span class="comment">// --- FUNZIONI DI SUPPORTO ---</span>
-<span class="type">float</span> <span class="function">leggiConsumo</span>() {
-  <span class="comment">// Simulazione calcolo da analogico a Watt</span>
-  <span class="keyword">return</span> (<span class="function">analogRead</span>(<span class="constant">PIN_CORRENTE</span>) * (<span class="number">3.3</span> / <span class="number">4095.0</span>)) * <span class="number">100</span>;
-}
-
-<span class="type">bool</span> <span class="function">falsoAllarmeWatt</span>(<span class="type">float</span> attuale) {
-  <span class="keyword">if</span> (attuale &gt; <span class="constant">LIMITE_WATT</span>) {
-    <span class="keyword">if</span> (inizioSogliaWatt == <span class="number">0</span>) inizioSogliaWatt = <span class="function">millis</span>();
-    <span class="keyword">if</span> ((<span class="function">millis</span>() - inizioSogliaWatt) / <span class="number">1000</span> &gt; <span class="constant">SEC_OVERLOAD</span>) <span class="keyword">return</span> <span class="constant">true</span>;
-  } <span class="keyword">else</span> {
-    inizioSogliaWatt = <span class="number">0</span>;
-  }
-  <span class="keyword">return</span> <span class="constant">false</span>;
-}
-
-<span class="type">void</span> <span class="function">attivaSicurezza</span>(<span class="type">bool</span> co2Critica, <span class="type">bool</span> wattCritico, <span class="type">int</span> v1, <span class="type">float</span> v2) {
-  <span class="function">digitalWrite</span>(<span class="constant">PIN_LED</span>, HIGH);
-  u8g2.<span class="function">clearBuffer</span>();
-  u8g2.<span class="function">setFont</span>(u8g2_font_haxrcorp408_tr);
-
-  <span class="keyword">if</span> (co2Critica) {
-    u8g2.<span class="function">drawStr</span>(<span class="number">0</span>, <span class="number">20</span>, <span class="string">&quot;!!! CO2 ALTA !!!&quot;</span>);
-    u8g2.<span class="function">drawStr</span>(<span class="number">0</span>, <span class="number">40</span>, <span class="string">&quot;APRIRE FINESTRE&quot;</span>);
-    <span class="function">tone</span>(<span class="constant">PIN_SPEAKER</span>, <span class="number">1200</span>); <span class="comment">// Suono acuto fisso</span>
-  } <span class="keyword">else if</span> (wattCritico) {
-    u8g2.<span class="function">drawStr</span>(<span class="number">0</span>, <span class="number">20</span>, <span class="string">&quot;!!! OVERLOAD !!!&quot;</span>);
-    u8g2.<span class="function">drawStr</span>(<span class="number">0</span>, <span class="number">40</span>, <span class="string">&quot;STACCARE CARICHI&quot;</span>);
-    <span class="function">tone</span>(<span class="constant">PIN_SPEAKER</span>, <span class="number">800</span>, <span class="number">500</span>); <span class="comment">// Beep intermittente</span>
-  }
-
-  u8g2.<span class="function">sendBuffer</span>();
-}
-
-<span class="type">void</span> <span class="function">disattivaSicurezza</span>() {
-  <span class="function">digitalWrite</span>(<span class="constant">PIN_LED</span>, LOW);
-  <span class="function">noTone</span>(<span class="constant">PIN_SPEAKER</span>);
-}
-
-<span class="type">void</span> <span class="function">aggiornaDisplay</span>(<span class="keyword">const</span> <span class="type">char</span>* stato, <span class="type">int</span> c, <span class="type">float</span> w) {
-  u8g2.<span class="function">clearBuffer</span>();
-  u8g2.<span class="function">setFont</span>(u8g2_font_6x10_tf);
-  u8g2.<span class="function">drawStr</span>(<span class="number">0</span>, <span class="number">10</span>, <span class="string">&quot;ZEPHYRUS MONITOR&quot;</span>);
-  u8g2.<span class="function">drawLine</span>(<span class="number">0</span>, <span class="number">12</span>, <span class="number">128</span>, <span class="number">12</span>);
-  u8g2.<span class="function">setCursor</span>(<span class="number">0</span>, <span class="number">30</span>);
-  u8g2.<span class="function">printf</span>(<span class="string">&quot;Stato: %s&quot;</span>, stato);
-  u8g2.<span class="function">setCursor</span>(<span class="number">0</span>, <span class="number">45</span>);
-  u8g2.<span class="function">printf</span>(<span class="string">&quot;CO2: %d ppm&quot;</span>, c);
-  u8g2.<span class="function">setCursor</span>(<span class="number">0</span>, <span class="number">60</span>);
-  u8g2.<span class="function">printf</span>(<span class="string">&quot;PWR: %.1f W&quot;</span>, w);
-  u8g2.<span class="function">sendBuffer</span>();
-}
-
-<span class="type">void</span> <span class="function">gestisciRiposo</span>() {
-  <span class="function">disattivaSicurezza</span>();
-  u8g2.<span class="function">clearBuffer</span>();
-  u8g2.<span class="function">setFont</span>(u8g2_font_6x12_tf);
-  u8g2.<span class="function">drawStr</span>(<span class="number">20</span>, <span class="number">35</span>, <span class="string">&quot;SLEEP - FUORI ORARIO&quot;</span>);
-  u8g2.<span class="function">sendBuffer</span>();
-
-  <span class="comment">// Opzionale: spegne il modulo WiFi per risparmiare</span>
-  WiFi.<span class="function">disconnect</span>();
-  <span class="function">delay</span>(<span class="number">60000</span>); <span class="comment">// Controlla l'ora ogni minuto</span>
-}
-
-<span class="type">void</span> <span class="function">connettiWiFi</span>() {
-  WiFi.<span class="function">begin</span>(SSID, PASS);
-  <span class="type">int</span> tentativi = <span class="number">0</span>;
-  <span class="keyword">while</span> (WiFi.<span class="function">status</span>() != WL_CONNECTED &amp;&amp; tentativi &lt; <span class="number">20</span>) {
-    <span class="function">delay</span>(<span class="number">500</span>);
-    tentativi++;
-  }
-}</pre>
+        <div class="card-title"><span class="material-symbols-rounded icon-sm">trending_down</span> Risparmio stimato</div>
+        <div class="spec-row"><span class="spec-key">Risparmio prototipo</span><span class="spec-val">€${savingsProto.toFixed(2).replace('.', ',')}</span></div>
+        <div class="spec-row"><span class="spec-key">Risparmio produzione</span><span class="spec-val">€${savingsProd.toFixed(2).replace('.', ',')}</span></div>
+        <div class="section-note">ESP32-C3 riduce costi e migliora scalabilita.</div>
       </div>
     </div>
   `;

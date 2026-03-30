@@ -4,9 +4,9 @@ import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
 // Set global defaults for dark theme
-Chart.defaults.color = 'hsl(215, 20%, 55%)';
-Chart.defaults.borderColor = 'hsla(220, 20%, 25%, 0.3)';
-Chart.defaults.font.family = "'Manrope', sans-serif";
+Chart.defaults.color = 'hsl(210, 12%, 42%)';
+Chart.defaults.borderColor = 'hsla(24, 15%, 45%, 0.25)';
+Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
 Chart.defaults.font.size = 11;
 
 export interface LineChartConfig {
@@ -17,7 +17,23 @@ export interface LineChartConfig {
     data: number[];
     color: string;
     threshold?: number;
+    tension?: number;
+    pointRadius?: number;
+    pointHoverRadius?: number;
+    fill?: boolean;
+    borderWidth?: number;
+    cubicInterpolationMode?: 'default' | 'monotone';
+    gradient?: { from: string; to: string };
   }[];
+  legend?: {
+    display?: boolean;
+    position?: 'top' | 'bottom';
+    align?: 'start' | 'center' | 'end';
+    padding?: number;
+    fontSize?: number;
+    boxWidth?: number;
+    usePointStyle?: boolean;
+  };
   yLabel?: string;
   yMin?: number;
   yMax?: number;
@@ -36,19 +52,28 @@ export function createLineChart(config: LineChartConfig): Chart {
   if (!canvas) {
     throw new Error(`Canvas ${config.canvasId} not found`);
   }
+  const ctx = canvas.getContext('2d');
 
   const datasets = config.datasets.map(ds => {
+    let background: any = ds.color + '15';
+    if (ctx && ds.gradient) {
+      const grad = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
+      grad.addColorStop(0, ds.gradient.from);
+      grad.addColorStop(1, ds.gradient.to);
+      background = grad;
+    }
     const result: any = {
       label: ds.label,
       data: [...ds.data],
       borderColor: ds.color,
-      backgroundColor: ds.color + '15',
-      borderWidth: 2,
-      fill: true,
-      tension: 0.4,
-      pointRadius: 0,
-      pointHoverRadius: 4,
+      backgroundColor: background,
+      borderWidth: ds.borderWidth ?? 2,
+      fill: ds.fill ?? true,
+      tension: ds.tension ?? 0.4,
+      pointRadius: ds.pointRadius ?? 0,
+      pointHoverRadius: ds.pointHoverRadius ?? 4,
       pointHoverBackgroundColor: ds.color,
+      cubicInterpolationMode: ds.cubicInterpolationMode ?? 'default',
     };
     return result;
   });
@@ -70,6 +95,8 @@ export function createLineChart(config: LineChartConfig): Chart {
     }
   });
 
+  const legendCfg = config.legend ?? {};
+
   const chart = new Chart(canvas, {
     type: 'line',
     data: {
@@ -80,7 +107,8 @@ export function createLineChart(config: LineChartConfig): Chart {
       responsive: true,
       maintainAspectRatio: false,
       animation: {
-        duration: 300,
+        duration: 600,
+        easing: 'easeOutQuart',
       },
       interaction: {
         mode: 'index',
@@ -88,13 +116,15 @@ export function createLineChart(config: LineChartConfig): Chart {
       },
       plugins: {
         legend: {
-          display: true,
-          position: 'top',
+          display: legendCfg.display ?? true,
+          position: legendCfg.position ?? 'top',
+          align: legendCfg.align ?? 'center',
           labels: {
-            usePointStyle: true,
+            usePointStyle: legendCfg.usePointStyle ?? true,
             pointStyle: 'circle',
-            padding: 15,
-            font: { size: 11 },
+            padding: legendCfg.padding ?? 15,
+            boxWidth: legendCfg.boxWidth ?? 10,
+            font: { size: legendCfg.fontSize ?? 11 },
           },
         },
         tooltip: {
@@ -140,7 +170,12 @@ export function createLineChart(config: LineChartConfig): Chart {
   return chart;
 }
 
-export function updateLineChart(canvasId: string, labels: string[], datasets: { data: number[]; threshold?: number }[]): void {
+export function updateLineChart(
+  canvasId: string,
+  labels: string[],
+  datasets: { data: number[]; threshold?: number }[],
+  options?: { yMin?: number; yMax?: number }
+): void {
   const chart = chartInstances.get(canvasId);
   if (!chart) return;
 
@@ -159,6 +194,33 @@ export function updateLineChart(canvasId: string, labels: string[], datasets: { 
     }
   });
 
+  if (options?.yMin !== undefined) {
+    (chart.options.scales as any).y.min = options.yMin;
+  }
+  if (options?.yMax !== undefined) {
+    (chart.options.scales as any).y.max = options.yMax;
+  }
+
+  chart.update('none');
+}
+
+export function updateBarChart(canvasId: string, data: number[][]): void {
+  const chart = chartInstances.get(canvasId);
+  if (!chart) return;
+  data.forEach((series, i) => {
+    if (chart.data.datasets[i]) {
+      chart.data.datasets[i].data = [...series];
+    }
+  });
+  chart.update('none');
+}
+
+export function updateDoughnutChart(canvasId: string, data: number[]): void {
+  const chart = chartInstances.get(canvasId);
+  if (!chart) return;
+  if (chart.data.datasets[0]) {
+    chart.data.datasets[0].data = [...data];
+  }
   chart.update('none');
 }
 
@@ -184,6 +246,10 @@ export function createBarChart(canvasId: string, labels: string[], data: number[
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: {
+        duration: 600,
+        easing: 'easeOutQuart',
+      },
       plugins: {
         legend: {
           position: 'top',
@@ -232,6 +298,10 @@ export function createDoughnutChart(canvasId: string, labels: string[], data: nu
       responsive: true,
       maintainAspectRatio: false,
       cutout: '65%',
+      animation: {
+        duration: 700,
+        easing: 'easeOutQuart',
+      },
       plugins: {
         legend: {
           position: 'bottom',

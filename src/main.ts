@@ -3,10 +3,9 @@ import './style.css';
 import { renderPresentation } from './pages/presentation';
 import { renderRoom3D, destroyRoom3D } from './pages/room3d';
 import { renderComponents } from './pages/components';
-import { renderSchematic } from './pages/schematic';
 import { renderArduino } from './pages/arduino';
 
-type Page = 'presentation' | 'simulation' | 'components' | 'schematic' | 'arduino';
+type Page = 'presentation' | 'simulation' | 'components' | 'arduino';
 
 interface NavItem {
   id: Page;
@@ -18,11 +17,45 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'presentation', label: 'Presentazione', icon: 'campaign' },
   { id: 'simulation', label: 'Simulazione', icon: 'view_in_ar' },
   { id: 'components', label: 'Componenti', icon: 'memory' },
-  { id: 'schematic', label: 'Schema', icon: 'electrical_services' },
   { id: 'arduino', label: 'Arduino vs Custom', icon: 'compare' },
 ];
 
 let currentPage: Page = 'presentation';
+let warpRaf = 0;
+let warpReady = false;
+
+function updateWarpEffect(): void {
+  warpRaf = 0;
+  const items = document.querySelectorAll<HTMLElement>('.warp-item');
+  if (items.length === 0) return;
+  const vh = window.innerHeight || 800;
+  const center = vh / 2;
+
+  items.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    const itemCenter = rect.top + rect.height / 2;
+    const dist = Math.abs(itemCenter - center);
+    const norm = Math.min(1, dist / (vh * 0.8));
+    const scale = 1 - norm * 0.08;
+    const offset = (itemCenter > center ? 1 : -1) * norm * 8;
+    const opacity = 1 - norm * 0.35;
+    el.style.setProperty('--warp-scale', scale.toFixed(3));
+    el.style.setProperty('--warp-y', `${offset.toFixed(2)}px`);
+    el.style.setProperty('--warp-opacity', opacity.toFixed(3));
+  });
+}
+
+function requestWarpEffect(): void {
+  if (warpRaf) return;
+  warpRaf = window.requestAnimationFrame(updateWarpEffect);
+}
+
+function ensureWarpEffect(): void {
+  if (warpReady) return;
+  warpReady = true;
+  window.addEventListener('scroll', requestWarpEffect, { passive: true });
+  window.addEventListener('resize', requestWarpEffect);
+}
 
 function createApp(): void {
   const app = document.getElementById('app');
@@ -73,6 +106,7 @@ function createApp(): void {
   }
 
   renderCurrentPage();
+  ensureWarpEffect();
 }
 
 function navigateTo(page: Page): void {
@@ -111,13 +145,12 @@ function renderCurrentPage(): void {
     case 'components':
       renderComponents(content);
       break;
-    case 'schematic':
-      renderSchematic(content);
-      break;
     case 'arduino':
       renderArduino(content);
       break;
   }
+
+  requestWarpEffect();
 }
 
 // Handle browser back/forward

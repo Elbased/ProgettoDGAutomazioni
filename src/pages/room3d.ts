@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { SimulationState, tick, createInitialState, SCENARIOS, Scenario, RoomType } from '../simulation';
 import { createGaugeSVG } from '../utils/gauge';
+import { createLineChart, updateLineChart } from '../utils/charts';
 
 let state: SimulationState = createInitialState();
 let intervalId: number | null = null;
@@ -15,6 +16,9 @@ let camera: any;
 let controls: any;
 let roomGroup: any;
 let fogParticles: any;
+let fogVelocities: Float32Array | null = null;
+let fogPhases: Float32Array | null = null;
+let fogBounds = { w: 0, h: 0, d: 0 };
 let ceilingLights: any[] = [];
 let lightHelpers: any[] = [];
 let alarmLights: any[] = [];
@@ -42,6 +46,7 @@ let alertBannerEl: HTMLElement | null = null;
 let alertTitleEl: HTMLElement | null = null;
 let alertSubEl: HTMLElement | null = null;
 let alertNoteEl: HTMLElement | null = null;
+let windowsWideOpen = false;
 
 type AlertState = 'ok' | 'warning' | 'danger';
 let alertState: AlertState = 'ok';
@@ -100,8 +105,33 @@ export function renderRoom3D(container: HTMLElement): void {
           </div>
         </div>
 
+        <!-- Timeline overlay -->
+        <div class="room-history-card">
+          <div class="room-history-title">
+            <span class="material-symbols-rounded icon-sm">timeline</span>
+            <span>Andamento nel tempo</span>
+            <div class="room-history-legend">
+              <span class="room-legend-item">
+                <span class="room-legend-dot co2"></span> CO2 eq (ppm)
+              </span>
+              <span class="room-legend-item">
+                <span class="room-legend-dot power"></span> Consumo (W)
+              </span>
+              <span class="room-legend-item">
+                <span class="room-legend-dot threshold"></span> Soglia CO2 eq
+              </span>
+              <span class="room-legend-item">
+                <span class="room-legend-dot threshold"></span> Soglia Consumo
+              </span>
+            </div>
+          </div>
+          <div class="room-history-chart">
+            <canvas id="room-history-chart"></canvas>
+          </div>
+        </div>
+
         <!-- Alert overlay -->
-        <div id="room-alerts" style="position:absolute; top:16px; right:320px; z-index:10; display:flex; flex-direction:column; gap:8px; max-width:350px;">
+        <div id="room-alerts" style="position:absolute; top:16px; right:16px; z-index:10; display:flex; flex-direction:column; gap:8px; max-width:360px;">
           <div class="alert-banner ok smooth" id="room-alert-banner">
             <span class="material-symbols-rounded icon-md" id="room-alert-icon">check_circle</span>
             <div>
@@ -208,6 +238,11 @@ export function renderRoom3D(container: HTMLElement): void {
               <span class="cb-custom"></span>
               <span>Finestre aperte</span>
             </label>
+            <label class="checkbox-label sub" data-option="windows-wide">
+              <input type="checkbox" id="cb-windows-wide">
+              <span class="cb-custom"></span>
+              <span>Apertura ampia</span>
+            </label>
           </div>
         </div>
 
@@ -234,6 +269,42 @@ export function renderRoom3D(container: HTMLElement): void {
   alertSubEl = document.getElementById('room-alert-sub');
   alertNoteEl = document.getElementById('room-alert-note');
   startLogoIntro();
+
+  const historyRange = getHistoryRange();
+  createLineChart({
+    canvasId: 'room-history-chart',
+    labels: state.timeLabels,
+    datasets: [
+      {
+        label: 'CO2 eq (ppm)',
+        data: state.co2History,
+        color: 'hsl(24, 55%, 42%)',
+        threshold: state.co2Threshold,
+        tension: 0.6,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+        fill: false,
+        borderWidth: 2,
+        cubicInterpolationMode: 'monotone',
+      },
+      {
+        label: 'Consumo (W)',
+        data: state.powerHistory,
+        color: 'hsl(30, 45%, 38%)',
+        threshold: state.powerThreshold,
+        tension: 0.6,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+        fill: false,
+        borderWidth: 2,
+        cubicInterpolationMode: 'monotone',
+      },
+    ],
+    legend: { display: false },
+    yLabel: 'ppm / W',
+    yMin: historyRange.yMin,
+    yMax: historyRange.yMax,
+  });
 
   initThreeJS();
   buildRoom(currentRoom);
@@ -281,7 +352,7 @@ function initThreeJS(): void {
   scene.add(ambient);
 
   // Hemisphere light for gentle sky/ground tint
-  const hemiLight = new THREE.HemisphereLight(0xe8f6ff, 0x9fb2c8, 0.35);
+  const hemiLight = new THREE.HemisphereLight(0xf5efe6, 0xbfb4a6, 0.35);
   scene.add(hemiLight);
 
   // Directional light from above (sun-like)
@@ -294,7 +365,7 @@ function initThreeJS(): void {
   scene.add(dirLight);
 
   // Cool rim light to separate the room from background
-  const rimLight = new THREE.DirectionalLight(0xaed6ff, 0.35);
+  const rimLight = new THREE.DirectionalLight(0xd6c2a8, 0.35);
   rimLight.position.set(-6, 6, -6);
   scene.add(rimLight);
 
@@ -392,7 +463,7 @@ function buildRoom(type: RoomType): void {
   const floorW = cfg.w - 0.02;
   const floorD = cfg.d - 0.02;
   const floorMat = new THREE.MeshStandardMaterial({
-    color: type === 'gym' ? 0xC4A45A : 0xb8c4cc,
+    color: type === 'gym' ? 0xC4A45A : 0xcfc6bb,
     roughness: 0.7,
     metalness: 0.05,
     side: THREE.FrontSide,
@@ -449,8 +520,8 @@ function buildRoom(type: RoomType): void {
 
   // Corner spheres
   const cornerMat = new THREE.MeshStandardMaterial({
-    color: 0x7fc7d9,
-    emissive: 0x3ea7bf,
+    color: 0xc9b39a,
+    emissive: 0xb48d6d,
     emissiveIntensity: 0.35,
     roughness: 0.4,
   });
@@ -487,7 +558,7 @@ function buildRoom(type: RoomType): void {
   // ===== WALLS (transparent material, DoubleSide) =====
   const createWall = (width: number, height: number, pos: number[], rotY: number, outwardNormal: number[]) => {
     const mat = new THREE.MeshStandardMaterial({
-      color: 0xcdd5de,
+      color: 0xd8d1c6,
       roughness: 0.8,
       transparent: true,
       opacity: 0.6,
@@ -514,7 +585,7 @@ function buildRoom(type: RoomType): void {
 
   // ===== CEILING (transparent) =====
   const ceilingMat = new THREE.MeshStandardMaterial({
-    color: 0xd8dde5,
+    color: 0xe0d7cb,
     roughness: 0.85,
     transparent: true,
     opacity: 0.5,
@@ -530,7 +601,7 @@ function buildRoom(type: RoomType): void {
 
   // ===== ROOM EDGES (lines on borders/spigoli) =====
   const edgeMat = new THREE.LineBasicMaterial({
-    color: 0x8fb8c8,
+    color: 0xb8aa96,
     transparent: true,
     opacity: 0.35,
   });
@@ -545,8 +616,8 @@ function buildRoom(type: RoomType): void {
   for (let i = 0; i < winCount; i++) {
     const winZ = -cfg.d / 2 + (i + 1) * cfg.d / (winCount + 1);
     const windowGroup = new THREE.Group();
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x607080, roughness: 0.6 });
-    const barMat = new THREE.MeshStandardMaterial({ color: 0x6b7a88, roughness: 0.6 });
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x7a7167, roughness: 0.6 });
+    const barMat = new THREE.MeshStandardMaterial({ color: 0x7f756a, roughness: 0.6 });
     const frameDepth = 0.05;
     const frameThickness = 0.04;
     const barThickness = 0.03;
@@ -602,7 +673,7 @@ function buildRoom(type: RoomType): void {
   // ===== GYM BASKETBALL COURT (near windows) =====
   if (type === 'gym') {
     const courtGroup = new THREE.Group();
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x7ea6b8, transparent: true, opacity: 0.45 });
+    const lineMat = new THREE.LineBasicMaterial({ color: 0xbba78f, transparent: true, opacity: 0.45 });
     const yLine = 0.012;
     const keyWidth = Math.min(3.6, cfg.d * 0.45);
     const keyDepth = Math.min(3.0, cfg.w * 0.32);
@@ -638,7 +709,7 @@ function buildRoom(type: RoomType): void {
     // Hoop + backboard moved away from wall with visible pole
     const poleX = cfg.w / 2 - 1.1;
     const poleZ = 0;
-    const poleMat = new THREE.MeshStandardMaterial({ color: 0x7f8f9f, roughness: 0.5 });
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x8a7f72, roughness: 0.5 });
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.6, 16), poleMat);
     pole.position.set(poleX, 1.3, poleZ);
     courtGroup.add(pole);
@@ -761,8 +832,8 @@ function buildRoom(type: RoomType): void {
     projectorScreen = new THREE.Mesh(
       new THREE.PlaneGeometry(2.2, 1.5),
       new THREE.MeshStandardMaterial({
-        color: 0x334455,
-        emissive: state.projectorOn ? 0x445577 : 0x000000,
+        color: 0x3f3a32,
+        emissive: state.projectorOn ? 0x4a4238 : 0x000000,
         emissiveIntensity: state.projectorOn ? 0.5 : 0,
         side: THREE.DoubleSide,
       })
@@ -775,7 +846,7 @@ function buildRoom(type: RoomType): void {
   const sensorGroup = new THREE.Group();
   sensorBox = new THREE.Mesh(
     new THREE.BoxGeometry(0.25, 0.18, 0.1),
-    new THREE.MeshStandardMaterial({ color: 0x1a2a3e, roughness: 0.4, metalness: 0.3 })
+    new THREE.MeshStandardMaterial({ color: 0x3c352d, roughness: 0.4, metalness: 0.3 })
   );
   sensorGroup.add(sensorBox);
 
@@ -796,7 +867,7 @@ function buildRoom(type: RoomType): void {
   labelCanvas.width = 128;
   labelCanvas.height = 32;
   const lctx = labelCanvas.getContext('2d')!;
-  lctx.fillStyle = '#00d4aa';
+  lctx.fillStyle = '#c28a54';
   lctx.font = 'bold 20px Manrope, sans-serif';
   lctx.textAlign = 'center';
   lctx.fillText('ZEPHYRUS', 64, 22);
@@ -811,7 +882,7 @@ function buildRoom(type: RoomType): void {
   // SCT-013 sensor
   const sctSensor = new THREE.Mesh(
     new THREE.CylinderGeometry(0.03, 0.03, 0.07, 16),
-    new THREE.MeshStandardMaterial({ color: 0x00aaff, metalness: 0.2 })
+    new THREE.MeshStandardMaterial({ color: 0xc48a53, metalness: 0.2 })
   );
   sctSensor.position.set(-0.18, 0, 0);
   sctSensor.rotation.z = Math.PI / 2;
@@ -860,6 +931,19 @@ function updateRoomOptionsVisibility(): void {
       setCheckbox(o.cbId, (state as any)[o.stateKey]);
     }
   });
+
+  const wideLabel = document.querySelector('.checkbox-label[data-option="windows-wide"]') as HTMLElement | null;
+  const wideCb = document.getElementById('cb-windows-wide') as HTMLInputElement | null;
+  if (wideLabel && wideCb) {
+    wideLabel.style.display = caps.windows ? 'flex' : 'none';
+    wideCb.disabled = !state.windowsOpen;
+    if (!state.windowsOpen) {
+      windowsWideOpen = false;
+      wideCb.checked = false;
+    } else {
+      wideCb.checked = windowsWideOpen;
+    }
+  }
 
   updateLights();
   updateProjector();
@@ -991,20 +1075,20 @@ function addDesk(x: number, z: number): void {
 function addChair(x: number, z: number): void {
   const seat = new THREE.Mesh(
     new THREE.BoxGeometry(0.4, 0.03, 0.4),
-    new THREE.MeshStandardMaterial({ color: 0x4477bb, roughness: 0.7 })
+    new THREE.MeshStandardMaterial({ color: 0xb6a089, roughness: 0.7 })
   );
   seat.position.set(x, 0.45, z);
   roomGroup.add(seat);
 
   const back = new THREE.Mesh(
     new THREE.BoxGeometry(0.4, 0.35, 0.03),
-    new THREE.MeshStandardMaterial({ color: 0x4477bb, roughness: 0.7 })
+    new THREE.MeshStandardMaterial({ color: 0xb6a089, roughness: 0.7 })
   );
   back.position.set(x, 0.65, z + 0.18);
   roomGroup.add(back);
 
   // Chair legs
-  const legMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.6 });
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x4a4034, roughness: 0.6 });
   const legGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.42, 8);
   const legOffsets: Array<[number, number]> = [
     [-0.18, -0.18],
@@ -1039,7 +1123,7 @@ function addTeacherDesk(x: number, z: number, withComputer: boolean = false): vo
   if (withComputer) {
     const monitorMat = new THREE.MeshStandardMaterial({
       color: 0x1f2328,
-      emissive: state.computersOn ? 0x223344 : 0x000000,
+      emissive: state.computersOn ? 0x3b332b : 0x000000,
       emissiveIntensity: state.computersOn ? 0.5 : 0,
     });
     const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.32, 0.02), monitorMat);
@@ -1070,7 +1154,7 @@ function addComputerDesk(x: number, z: number, flip: boolean): void {
     new THREE.BoxGeometry(0.4, 0.3, 0.02),
     new THREE.MeshStandardMaterial({
       color: 0x222222,
-      emissive: state.computersOn ? 0x334466 : 0x000000,
+      emissive: state.computersOn ? 0x4b4236 : 0x000000,
       emissiveIntensity: state.computersOn ? 0.6 : 0,
     })
   );
@@ -1090,18 +1174,24 @@ function addComputerDesk(x: number, z: number, flip: boolean): void {
 
 // ===== FOG =====
 function createFogParticles(cfg: { w: number; h: number; d: number }): void {
-  const particleCount = 400;
+  const particleCount = 520;
   const positions = new Float32Array(particleCount * 3);
+  const velocities = new Float32Array(particleCount * 3);
+  const phases = new Float32Array(particleCount);
   for (let i = 0; i < particleCount; i++) {
     positions[i * 3] = (Math.random() - 0.5) * cfg.w;
     positions[i * 3 + 1] = Math.random() * cfg.h;
     positions[i * 3 + 2] = (Math.random() - 0.5) * cfg.d;
+    velocities[i * 3] = (Math.random() - 0.5) * 0.004;
+    velocities[i * 3 + 1] = Math.random() * 0.002 + 0.0003;
+    velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.004;
+    phases[i] = Math.random() * Math.PI * 2;
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   const material = new THREE.PointsMaterial({
-    color: 0x99bbdd,
-    size: 0.06,
+    color: 0xd2b79c,
+    size: 0.07,
     transparent: true,
     opacity: 0,
     blending: THREE.AdditiveBlending,
@@ -1113,6 +1203,9 @@ function createFogParticles(cfg: { w: number; h: number; d: number }): void {
     (fogParticles.material as any).dispose();
   }
   fogParticles = new THREE.Points(geometry, material);
+  fogVelocities = velocities;
+  fogPhases = phases;
+  fogBounds = { w: cfg.w, h: cfg.h, d: cfg.d };
   scene.add(fogParticles);
 }
 
@@ -1120,9 +1213,33 @@ function updateFog(): void {
   if (!fogParticles) return;
   const mat = fogParticles.material as any;
   const co2Ratio = Math.min(1, Math.max(0, (state.co2 - 400) / 1600));
-  mat.opacity = co2Ratio * 0.35;
+  const windowFactor = state.windowsOpen ? (windowsWideOpen ? 0.45 : 0.6) : 1;
+  mat.opacity = co2Ratio * 0.35 * windowFactor;
   mat.size = 0.04 + co2Ratio * 0.08;
-  fogParticles.rotation.y += 0.0005;
+  fogParticles.rotation.y += 0.0003;
+
+  const positions = (fogParticles.geometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
+  const count = positions.length / 3;
+  const flow = state.windowsOpen ? (windowsWideOpen ? 0.018 : 0.01) : 0.0035;
+  const lift = state.windowsOpen ? 0.003 : 0.0012;
+  const turbulence = state.windowsOpen ? 0.004 : 0.002;
+  if (fogVelocities && fogPhases) {
+    for (let i = 0; i < count; i++) {
+      const idx = i * 3;
+      fogPhases[i] += 0.02;
+      const phase = fogPhases[i];
+      positions[idx] += fogVelocities[idx] + flow + Math.sin(phase) * turbulence;
+      positions[idx + 1] += fogVelocities[idx + 1] + lift;
+      positions[idx + 2] += fogVelocities[idx + 2] + Math.cos(phase) * turbulence;
+
+      if (positions[idx] > fogBounds.w / 2) positions[idx] = -fogBounds.w / 2;
+      if (positions[idx] < -fogBounds.w / 2) positions[idx] = fogBounds.w / 2;
+      if (positions[idx + 2] > fogBounds.d / 2) positions[idx + 2] = -fogBounds.d / 2;
+      if (positions[idx + 2] < -fogBounds.d / 2) positions[idx + 2] = fogBounds.d / 2;
+      if (positions[idx + 1] > fogBounds.h) positions[idx + 1] = 0;
+    }
+    (fogParticles.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+  }
 
   if (ledIndicator) {
     const combinedStatus = state.co2Status === 'danger' || state.powerStatus === 'danger'
@@ -1159,7 +1276,20 @@ function bindDashboardControls(): void {
   bindCheckbox('cb-projector', v => { state.projectorOn = v; updateProjector(); });
   bindCheckbox('cb-computers', v => { state.computersOn = v; updateComputers(); });
   bindCheckbox('cb-heating', v => { state.heatingOn = v; });
-  bindCheckbox('cb-windows', v => { state.windowsOpen = v; updateWindows(); });
+  bindCheckbox('cb-windows', v => {
+    state.windowsOpen = v;
+    if (!v) {
+      windowsWideOpen = false;
+      setCheckbox('cb-windows-wide', false);
+    }
+    const wideCb = document.getElementById('cb-windows-wide') as HTMLInputElement | null;
+    if (wideCb) wideCb.disabled = !state.windowsOpen;
+    updateWindows();
+  });
+  bindCheckbox('cb-windows-wide', v => {
+    windowsWideOpen = v;
+    updateWindows();
+  });
 
   document.querySelectorAll('.room-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1200,6 +1330,7 @@ function applyScenario(s: Scenario): void {
   state.projectorOn = s.projectorOn;
   state.computersOn = s.computersOn;
   state.windowsOpen = s.windowsOpen;
+  windowsWideOpen = false;
   state.heatingOn = s.heatingOn;
 
   setSlider('sl-students', s.students);
@@ -1208,6 +1339,7 @@ function applyScenario(s: Scenario): void {
   setCheckbox('cb-computers', s.computersOn);
   setCheckbox('cb-heating', s.heatingOn);
   setCheckbox('cb-windows', s.windowsOpen);
+  setCheckbox('cb-windows-wide', false);
 
   updateRoomOptionsVisibility();
 }
@@ -1277,7 +1409,7 @@ function animateAlarmLights(time: number): void {
 function updateProjector(): void {
   if (projectorScreen) {
     const mat = projectorScreen.material as any;
-    mat.emissive.setHex(state.projectorOn ? 0x445577 : 0x000000);
+    mat.emissive.setHex(state.projectorOn ? 0x4a4238 : 0x000000);
     mat.emissiveIntensity = state.projectorOn ? 0.5 : 0;
   }
 }
@@ -1285,15 +1417,15 @@ function updateProjector(): void {
 function updateComputers(): void {
   computerScreens.forEach(mesh => {
     const mat = mesh.material as any;
-    mat.emissive.setHex(state.computersOn ? 0x334466 : 0x000000);
+    mat.emissive.setHex(state.computersOn ? 0x4b4236 : 0x000000);
     mat.emissiveIntensity = state.computersOn ? 0.6 : 0;
   });
 }
 
 function updateWindows(): void {
   windowFrames.forEach(w => {
-    w.frameMat.color.setHex(0x607080);
-    w.barMat.color.setHex(0x6b7a88);
+    w.frameMat.color.setHex(0x7a7167);
+    w.barMat.color.setHex(0x7f756a);
     w.frameMat.emissive = w.frameMat.emissive ?? new THREE.Color(0x000000);
     w.barMat.emissive = w.barMat.emissive ?? new THREE.Color(0x000000);
     w.frameMat.emissiveIntensity = 0;
@@ -1303,8 +1435,8 @@ function updateWindows(): void {
 
 function animateWindows(time: number): void {
   if (windowFrames.length === 0) return;
-  const openAngle = -0.32;
-  const openOffset = 0.02;
+  const openAngle = windowsWideOpen ? -0.62 : -0.32;
+  const openOffset = windowsWideOpen ? 0.06 : 0.02;
   const smooth = 0.08;
   windowFrames.forEach(w => {
     const targetRot = state.windowsOpen ? openAngle : 0;
@@ -1322,6 +1454,32 @@ function startSimulation(): void {
     updateDashboardUI();
   }, 1000);
   updateDashboardUI();
+}
+
+function getHistoryRange(): { yMin: number; yMax: number } {
+  const co2Min = Math.min(...state.co2History);
+  const co2Max = Math.max(...state.co2History);
+  const powerMin = Math.min(...state.powerHistory);
+  const powerMax = Math.max(...state.powerHistory);
+
+  const dataMin = Math.min(co2Min, powerMin);
+  const dataMax = Math.max(co2Max, powerMax);
+  const range = Math.max(50, dataMax - dataMin);
+  const pad = Math.max(20, range * 0.18);
+
+  let yMin = Math.max(0, dataMin - pad);
+  let yMax = dataMax + pad;
+
+  const threshMin = Math.min(state.co2Threshold, state.powerThreshold);
+  const threshMax = Math.max(state.co2Threshold, state.powerThreshold);
+  const includeThresh = threshMin <= dataMax + range * 1.2 && threshMax >= dataMin - range * 1.2;
+
+  if (includeThresh) {
+    yMin = Math.min(yMin, threshMin - pad * 0.5);
+    yMax = Math.max(yMax, threshMax + pad * 0.5);
+  }
+
+  return { yMin, yMax };
 }
 
 function updateDashboardUI(): void {
@@ -1356,7 +1514,7 @@ function updateDashboardUI(): void {
     miniCo2.innerHTML = createGaugeSVG({
       min: 300, max: 2500, value: state.co2, threshold: state.co2Threshold,
       unit: 'ppm', label: 'CO₂ eq',
-      colorOk: 'hsl(206, 55%, 55%)', colorWarning: 'hsl(38, 92%, 55%)', colorDanger: 'hsl(0, 80%, 60%)',
+      colorOk: 'hsl(24, 55%, 42%)', colorWarning: 'hsl(38, 85%, 50%)', colorDanger: 'hsl(0, 70%, 52%)',
     });
   }
   const miniPower = document.getElementById('mini-gauge-power');
@@ -1364,7 +1522,7 @@ function updateDashboardUI(): void {
     miniPower.innerHTML = createGaugeSVG({
       min: 0, max: 3000, value: state.power, threshold: state.powerThreshold,
       unit: 'W', label: 'Consumo',
-      colorOk: 'hsl(210, 80%, 60%)', colorWarning: 'hsl(38, 92%, 55%)', colorDanger: 'hsl(0, 80%, 60%)',
+      colorOk: 'hsl(30, 45%, 38%)', colorWarning: 'hsl(38, 85%, 50%)', colorDanger: 'hsl(0, 70%, 52%)',
     });
   }
 
@@ -1410,6 +1568,12 @@ function updateDashboardUI(): void {
     roomAlarmOverlay.classList.toggle('active', alertState === 'danger');
     roomAlarmOverlay.classList.toggle('warning', alertState === 'warning');
   }
+
+  const historyRange = getHistoryRange();
+  updateLineChart('room-history-chart', state.timeLabels, [
+    { data: state.co2History, threshold: state.co2Threshold },
+    { data: state.powerHistory, threshold: state.powerThreshold },
+  ], { yMin: historyRange.yMin, yMax: historyRange.yMax });
 }
 
 function updateLed(id: string, status: 'ok' | 'warning' | 'danger'): void {

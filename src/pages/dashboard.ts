@@ -173,7 +173,7 @@ export function renderDashboard(container: HTMLElement): void {
   createLineChart({
     canvasId: 'chart-co2',
     labels: state.timeLabels,
-    datasets: [{ label: 'CO₂ eq (ppm)', data: state.co2History, color: 'hsl(206, 55%, 55%)', threshold: state.co2Threshold }],
+    datasets: [{ label: 'CO₂ eq (ppm)', data: state.co2History, color: 'hsl(24, 55%, 42%)', threshold: state.co2Threshold }],
     yLabel: 'ppm',
     yMin: 300,
   });
@@ -181,7 +181,7 @@ export function renderDashboard(container: HTMLElement): void {
   createLineChart({
     canvasId: 'chart-power',
     labels: state.timeLabels,
-    datasets: [{ label: 'Consumo (W)', data: state.powerHistory, color: 'hsl(210, 80%, 60%)', threshold: state.powerThreshold }],
+    datasets: [{ label: 'Consumo (W)', data: state.powerHistory, color: 'hsl(30, 45%, 38%)', threshold: state.powerThreshold }],
     yLabel: 'Watt',
     yMin: 0,
   });
@@ -286,7 +286,7 @@ function updateUI(): void {
     gaugeCo2.innerHTML = createGaugeSVG({
       min: 300, max: 2500, value: state.co2, threshold: state.co2Threshold,
       unit: 'ppm', label: 'CO₂ eq',
-      colorOk: 'hsl(206, 55%, 55%)', colorWarning: 'hsl(38, 92%, 55%)', colorDanger: 'hsl(0, 80%, 60%)',
+      colorOk: 'hsl(24, 55%, 42%)', colorWarning: 'hsl(38, 85%, 50%)', colorDanger: 'hsl(0, 70%, 52%)',
     });
   }
 
@@ -295,7 +295,7 @@ function updateUI(): void {
     gaugePower.innerHTML = createGaugeSVG({
       min: 0, max: 3000, value: state.power, threshold: state.powerThreshold,
       unit: 'W', label: 'Consumo',
-      colorOk: 'hsl(210, 80%, 60%)', colorWarning: 'hsl(38, 92%, 55%)', colorDanger: 'hsl(0, 80%, 60%)',
+      colorOk: 'hsl(30, 45%, 38%)', colorWarning: 'hsl(38, 85%, 50%)', colorDanger: 'hsl(0, 70%, 52%)',
     });
   }
 
