@@ -24,7 +24,7 @@ let lightHelpers: any[] = [];
 let alarmLights: any[] = [];
 let sensorBox: any;
 let ledIndicator: any;
-let windowFrames: { group: any; frameMat: any; barMat: any; baseX: number; phase: number }[] = [];
+let windowFrames: { group: any; frameMat: any; barMat: any; baseX: number; baseY: number; baseZ: number; winW: number; winH: number; phase: number }[] = [];
 let computerScreens: any[] = [];
 let projectorScreen: any;
 
@@ -47,6 +47,10 @@ let alertTitleEl: HTMLElement | null = null;
 let alertSubEl: HTMLElement | null = null;
 let alertNoteEl: HTMLElement | null = null;
 let windowsWideOpen = false;
+let autoRotateEnabled = true;
+let autoRotateSpeed = 0.38;
+let autoRotateCurrent = 0.38;
+let autoRotateResumeTimer: number | null = null;
 
 type AlertState = 'ok' | 'warning' | 'danger';
 let alertState: AlertState = 'ok';
@@ -346,6 +350,24 @@ function initThreeJS(): void {
   controls.maxPolarAngle = Math.PI * 0.85;
   controls.minDistance = 3;
   controls.maxDistance = 20;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = autoRotateCurrent;
+  controls.addEventListener('start', () => {
+    autoRotateEnabled = false;
+    autoRotateCurrent = 0;
+    controls.autoRotate = false;
+    controls.autoRotateSpeed = 0;
+    if (autoRotateResumeTimer) {
+      window.clearTimeout(autoRotateResumeTimer);
+      autoRotateResumeTimer = null;
+    }
+  });
+  controls.addEventListener('end', () => {
+    if (autoRotateResumeTimer) window.clearTimeout(autoRotateResumeTimer);
+    autoRotateResumeTimer = window.setTimeout(() => {
+      autoRotateEnabled = true;
+    }, 900);
+  });
 
   // Ambient light (soft, balanced)
   const ambient = new THREE.AmbientLight(0xffffff, 0.55);
@@ -385,6 +407,10 @@ function initThreeJS(): void {
     animateLights(time);
     animateAlarmLights(time);
     animateWindows(time);
+    const targetRotate = autoRotateEnabled ? autoRotateSpeed : 0;
+    autoRotateCurrent += (targetRotate - autoRotateCurrent) * 0.04;
+    controls.autoRotateSpeed = autoRotateCurrent;
+    controls.autoRotate = autoRotateCurrent > 0.001;
     controls.update();
     updateWallTransparency();
     updateFog();
@@ -663,7 +689,17 @@ function buildRoom(type: RoomType): void {
     windowPivot.add(windowGroup);
     windowPivot.position.set(baseX, baseY, winZ);
     roomGroup.add(windowPivot);
-    windowFrames.push({ group: windowPivot, frameMat, barMat, baseX, phase: Math.random() * Math.PI * 2 });
+    windowFrames.push({
+      group: windowPivot,
+      frameMat,
+      barMat,
+      baseX,
+      baseY,
+      baseZ: winZ,
+      winW,
+      winH,
+      phase: Math.random() * Math.PI * 2,
+    });
 
     if (i === 0) {
       labels3D.push({ name: 'Finestre', position: new THREE.Vector3(cfg.w / 2 - 0.01, cfg.h * 0.55 + 0.4, winZ) });
@@ -979,14 +1015,14 @@ function createLabelElements(): void {
     const el = document.createElement('div');
     el.className = 'room-label';
     el.innerHTML = `<span class="room-label-dot"></span><span class="room-label-text">${label.name}</span>`;
-    el.style.cssText = 'position:absolute; display:flex; align-items:center; gap:6px; font-size:0.72rem; font-weight:600; color:hsl(206,45%,30%); white-space:nowrap; pointer-events:none; transition:opacity 0.3s;';
+    el.style.cssText = 'position:absolute; display:flex; align-items:center; gap:6px; font-size:0.72rem; font-weight:600; color:var(--accent-text); white-space:nowrap; pointer-events:none; transition:opacity 0.3s;';
     labelOverlay.appendChild(el);
     label.element = el;
 
     // SVG line
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('class', 'label-line');
-    line.setAttribute('stroke', 'hsla(206,45%,45%,0.45)');
+    line.setAttribute('stroke', 'hsla(24,55%,45%,0.45)');
     line.setAttribute('stroke-width', '1.2');
     labelSvg.appendChild(line);
     label.lineElement = line;
@@ -1220,10 +1256,21 @@ function updateFog(): void {
 
   const positions = (fogParticles.geometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
   const count = positions.length / 3;
-  const flow = state.windowsOpen ? (windowsWideOpen ? 0.018 : 0.01) : 0.0035;
-  const lift = state.windowsOpen ? 0.003 : 0.0012;
-  const turbulence = state.windowsOpen ? 0.004 : 0.002;
+  const flow = state.windowsOpen ? (windowsWideOpen ? 0.022 : 0.012) : 0.0035;
+  const lift = state.windowsOpen ? (windowsWideOpen ? 0.001 : 0.003) : 0.0012;
+  const turbulence = state.windowsOpen ? 0.0035 : 0.002;
   if (fogVelocities && fogPhases) {
+    const resetParticle = (i: number, biasX?: number): void => {
+      const idx = i * 3;
+      positions[idx] = biasX ?? (Math.random() - 0.5) * fogBounds.w;
+      positions[idx + 1] = Math.random() * fogBounds.h;
+      positions[idx + 2] = (Math.random() - 0.5) * fogBounds.d;
+      fogVelocities[idx] = (Math.random() - 0.5) * 0.004;
+      fogVelocities[idx + 1] = Math.random() * 0.002 + 0.0003;
+      fogVelocities[idx + 2] = (Math.random() - 0.5) * 0.004;
+      fogPhases[i] = Math.random() * Math.PI * 2;
+    };
+
     for (let i = 0; i < count; i++) {
       const idx = i * 3;
       fogPhases[i] += 0.02;
@@ -1232,7 +1279,30 @@ function updateFog(): void {
       positions[idx + 1] += fogVelocities[idx + 1] + lift;
       positions[idx + 2] += fogVelocities[idx + 2] + Math.cos(phase) * turbulence;
 
-      if (positions[idx] > fogBounds.w / 2) positions[idx] = -fogBounds.w / 2;
+      if (state.windowsOpen && windowFrames.length) {
+        for (const w of windowFrames) {
+          const windowCenterY = w.baseY + w.winH / 2;
+          const dz = Math.abs(positions[idx + 2] - w.baseZ);
+          const dy = Math.abs(positions[idx + 1] - windowCenterY);
+          const zRadius = w.winW * 0.55;
+          const yRadius = w.winH * 0.55;
+          if (dz < zRadius && dy < yRadius) {
+            const zWeight = 1 - dz / zRadius;
+            const yWeight = 1 - dy / yRadius;
+            const influence = Math.min(1, (zWeight + yWeight) * 0.55);
+            const outflow = (windowsWideOpen ? 0.032 : 0.02) * influence;
+            positions[idx] += outflow;
+            positions[idx + 2] += (w.baseZ - positions[idx + 2]) * influence * 0.04;
+            positions[idx + 1] += (windowCenterY - positions[idx + 1]) * influence * (windowsWideOpen ? 0.01 : 0.02);
+          }
+        }
+      }
+
+      if (state.windowsOpen && positions[idx] > fogBounds.w / 2 + 0.15) {
+        resetParticle(i, -fogBounds.w / 2 + Math.random() * 0.6);
+        continue;
+      }
+      if (!state.windowsOpen && positions[idx] > fogBounds.w / 2) positions[idx] = -fogBounds.w / 2;
       if (positions[idx] < -fogBounds.w / 2) positions[idx] = fogBounds.w / 2;
       if (positions[idx + 2] > fogBounds.d / 2) positions[idx + 2] = -fogBounds.d / 2;
       if (positions[idx + 2] < -fogBounds.d / 2) positions[idx + 2] = fogBounds.d / 2;
@@ -1435,13 +1505,16 @@ function updateWindows(): void {
 
 function animateWindows(time: number): void {
   if (windowFrames.length === 0) return;
-  const openAngle = windowsWideOpen ? -0.62 : -0.32;
-  const openOffset = windowsWideOpen ? 0.06 : 0.02;
+  const tiltAngle = windowsWideOpen ? 0 : -0.32;
+  const swingAngle = windowsWideOpen ? -1.15 : 0;
+  const openOffset = windowsWideOpen ? 0.12 : 0.02;
   const smooth = 0.08;
   windowFrames.forEach(w => {
-    const targetRot = state.windowsOpen ? openAngle : 0;
+    const targetRotZ = state.windowsOpen ? tiltAngle : 0;
+    const targetRotY = state.windowsOpen ? swingAngle : 0;
     const targetX = w.baseX + (state.windowsOpen ? openOffset : 0);
-    w.group.rotation.z += (targetRot - w.group.rotation.z) * smooth;
+    w.group.rotation.z += (targetRotZ - w.group.rotation.z) * smooth;
+    w.group.rotation.y += (targetRotY - w.group.rotation.y) * smooth;
     w.group.position.x += (targetX - w.group.position.x) * smooth;
   });
 }
