@@ -15,6 +15,7 @@ $isWindows = $env:OS -eq "Windows_NT"
 
 function Add-KnownNodePaths {
   $paths = @(
+    (Get-PortableNodeDir),
     "$env:ProgramFiles\nodejs",
     "$env:ProgramFiles(x86)\nodejs",
     "$env:LOCALAPPDATA\Programs\nodejs"
@@ -44,34 +45,63 @@ function Resolve-NpmCommand {
   return $null
 }
 
+function Get-PortableNodeBase {
+  return Join-Path $env:LOCALAPPDATA "ZephyrusTech\node"
+}
+
+function Get-PortableNodeDir {
+  $currentFile = Join-Path (Get-PortableNodeBase) "current.txt"
+  if (-not (Test-Path $currentFile)) { return $null }
+
+  $portableDir = (Get-Content -LiteralPath $currentFile -ErrorAction SilentlyContinue | Select-Object -First 1).Trim()
+  if (-not $portableDir) { return $null }
+  if (-not (Test-Path $portableDir)) { return $null }
+
+  return $portableDir
+}
+
 function Install-NodeViaWinget {
   if (-not $isWindows) { return }
   if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { return }
 
   Write-Host "Installing Node.js LTS with winget..."
-  winget install -e --id OpenJS.NodeJS.LTS --source winget | Out-Null
+  winget install -e --id OpenJS.NodeJS.LTS --source winget --accept-source-agreements --accept-package-agreements --silent --disable-interactivity | Out-Null
 }
 
-function Install-NodeViaMsi {
+function Install-NodePortable {
   if (-not $isWindows) { return }
 
   Write-Host "Installing Node.js LTS via direct download..."
   $arch = if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" }
-  $base = "https://nodejs.org/dist/latest-v20.x/"
-  $html = Invoke-WebRequest -UseBasicParsing $base
-  $msi = ($html.Links | Where-Object { $_.href -match "node-v\\d+\\.\\d+\\.\\d+-$arch\\.msi" } | Select-Object -First 1).href
-
-  if (-not $msi) {
-    throw "MSI not found"
+  $index = Invoke-RestMethod "https://nodejs.org/dist/index.json"
+  $lts = $index | Where-Object { $_.lts } | Select-Object -First 1
+  if (-not $lts) {
+    throw "Unable to resolve latest Node.js LTS version."
   }
 
-  $url = $base + $msi
-  $dest = Join-Path $env:TEMP $msi
+  $zipName = "node-$($lts.version)-win-$arch.zip"
+  if ($lts.files -notcontains "win-$arch-zip") {
+    throw "Portable Node.js package not available for architecture $arch."
+  }
+
+  $url = "https://nodejs.org/dist/$($lts.version)/$zipName"
+  $dest = Join-Path $env:TEMP $zipName
+  $baseDir = Get-PortableNodeBase
+  $portableDir = Join-Path $baseDir ("node-$($lts.version)-win-$arch")
+
   Invoke-WebRequest $url -OutFile $dest
-  Start-Process msiexec.exe -Wait -ArgumentList "/i `"$dest`" /qn /norestart ALLUSERS=0"
+  New-Item -ItemType Directory -Force -Path $baseDir | Out-Null
+
+  if (Test-Path $portableDir) {
+    Remove-Item -LiteralPath $portableDir -Recurse -Force
+  }
+
+  Expand-Archive -LiteralPath $dest -DestinationPath $baseDir -Force
+  Set-Content -LiteralPath (Join-Path $baseDir "current.txt") -Value $portableDir
 }
 
 function Ensure-Node {
+  Add-KnownNodePaths
   if (Get-Command node -ErrorAction SilentlyContinue) {
     return
   }
@@ -81,7 +111,7 @@ function Ensure-Node {
     Add-KnownNodePaths
     if (Get-Command node -ErrorAction SilentlyContinue) { return }
 
-    Install-NodeViaMsi
+    Install-NodePortable
     Add-KnownNodePaths
     if (Get-Command node -ErrorAction SilentlyContinue) { return }
   }
@@ -120,6 +150,9 @@ try {
 } catch {
   Write-Host ""
   Write-Host "Avvio interrotto."
+  if ($_.Exception.Message) {
+    Write-Host $_.Exception.Message
+  }
   Write-Host ""
   exit 1
 }

@@ -13,9 +13,6 @@ if not defined ZEPHYRUS_BANNER_SHOWN (
 set "ZEPHYRUS_BANNER_SHOWN=1"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%avvio.ps1"
 if errorlevel 1 (
-  echo.
-  echo Avvio interrotto.
-  echo.
   pause
   exit /b 1
 )
