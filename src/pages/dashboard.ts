@@ -205,7 +205,7 @@ function renderScenarios(): void {
   if (!grid) return;
   grid.innerHTML = SCENARIOS.map((s, i) => `
     <button class="scenario-btn" data-scenario="${i}">
-      <span class="emoji">${s.emoji}</span>
+      <span class="material-symbols-rounded emoji">${s.icon}</span>
       ${s.name}
     </button>
   `).join('');

@@ -990,10 +990,12 @@ function updateRoomOptionsVisibility(): void {
 // ===== LABEL SYSTEM =====
 function createLabelElements(): void {
   if (!labelOverlay || !labelSvg) return;
+  const overlay = labelOverlay;
+  const svg = labelSvg;
   
   // Clear existing
-  labelOverlay.innerHTML = '';
-  while (labelSvg.firstChild) labelSvg.removeChild(labelSvg.firstChild);
+  overlay.innerHTML = '';
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
 
   // Defs for animated dash pattern
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
@@ -1008,7 +1010,7 @@ function createLabelElements(): void {
       }
     </style>
   `;
-  labelSvg.appendChild(defs);
+  svg.appendChild(defs);
 
   labels3D.forEach((label, i) => {
     // HTML label element
@@ -1016,7 +1018,7 @@ function createLabelElements(): void {
     el.className = 'room-label';
     el.innerHTML = `<span class="room-label-dot"></span><span class="room-label-text">${label.name}</span>`;
     el.style.cssText = 'position:absolute; display:flex; align-items:center; gap:6px; font-size:0.72rem; font-weight:600; color:var(--accent-text); white-space:nowrap; pointer-events:none; transition:opacity 0.3s;';
-    labelOverlay.appendChild(el);
+    overlay.appendChild(el);
     label.element = el;
 
     // SVG line
@@ -1024,7 +1026,7 @@ function createLabelElements(): void {
     line.setAttribute('class', 'label-line');
     line.setAttribute('stroke', 'hsla(24,55%,45%,0.45)');
     line.setAttribute('stroke-width', '1.2');
-    labelSvg.appendChild(line);
+    svg.appendChild(line);
     label.lineElement = line;
   });
 }
@@ -1254,30 +1256,33 @@ function updateFog(): void {
   mat.size = 0.04 + co2Ratio * 0.08;
   fogParticles.rotation.y += 0.0003;
 
-  const positions = (fogParticles.geometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
+  const positionAttr = fogParticles.geometry.getAttribute('position');
+  const positions = positionAttr.array as Float32Array;
   const count = positions.length / 3;
   const flow = state.windowsOpen ? (windowsWideOpen ? 0.022 : 0.012) : 0.0035;
   const lift = state.windowsOpen ? (windowsWideOpen ? 0.001 : 0.003) : 0.0012;
   const turbulence = state.windowsOpen ? 0.0035 : 0.002;
   if (fogVelocities && fogPhases) {
+    const velocities = fogVelocities;
+    const phases = fogPhases;
     const resetParticle = (i: number, biasX?: number): void => {
       const idx = i * 3;
       positions[idx] = biasX ?? (Math.random() - 0.5) * fogBounds.w;
       positions[idx + 1] = Math.random() * fogBounds.h;
       positions[idx + 2] = (Math.random() - 0.5) * fogBounds.d;
-      fogVelocities[idx] = (Math.random() - 0.5) * 0.004;
-      fogVelocities[idx + 1] = Math.random() * 0.002 + 0.0003;
-      fogVelocities[idx + 2] = (Math.random() - 0.5) * 0.004;
-      fogPhases[i] = Math.random() * Math.PI * 2;
+      velocities[idx] = (Math.random() - 0.5) * 0.004;
+      velocities[idx + 1] = Math.random() * 0.002 + 0.0003;
+      velocities[idx + 2] = (Math.random() - 0.5) * 0.004;
+      phases[i] = Math.random() * Math.PI * 2;
     };
 
     for (let i = 0; i < count; i++) {
       const idx = i * 3;
-      fogPhases[i] += 0.02;
-      const phase = fogPhases[i];
-      positions[idx] += fogVelocities[idx] + flow + Math.sin(phase) * turbulence;
-      positions[idx + 1] += fogVelocities[idx + 1] + lift;
-      positions[idx + 2] += fogVelocities[idx + 2] + Math.cos(phase) * turbulence;
+      phases[i] += 0.02;
+      const phase = phases[i];
+      positions[idx] += velocities[idx] + flow + Math.sin(phase) * turbulence;
+      positions[idx + 1] += velocities[idx + 1] + lift;
+      positions[idx + 2] += velocities[idx + 2] + Math.cos(phase) * turbulence;
 
       if (state.windowsOpen && windowFrames.length) {
         for (const w of windowFrames) {
@@ -1308,7 +1313,7 @@ function updateFog(): void {
       if (positions[idx + 2] < -fogBounds.d / 2) positions[idx + 2] = fogBounds.d / 2;
       if (positions[idx + 1] > fogBounds.h) positions[idx + 1] = 0;
     }
-    (fogParticles.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    positionAttr.needsUpdate = true;
   }
 
   if (ledIndicator) {
