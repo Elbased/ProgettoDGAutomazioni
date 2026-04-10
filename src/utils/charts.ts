@@ -204,9 +204,12 @@ export function updateLineChart(
   chart.update('none');
 }
 
-export function updateBarChart(canvasId: string, data: number[][]): void {
+export function updateBarChart(canvasId: string, data: number[][], labels?: string[]): void {
   const chart = chartInstances.get(canvasId);
   if (!chart) return;
+  if (labels) {
+    chart.data.labels = [...labels];
+  }
   data.forEach((series, i) => {
     if (chart.data.datasets[i]) {
       chart.data.datasets[i].data = [...series];

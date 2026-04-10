@@ -89,8 +89,8 @@ export interface Alert {
 const CO2_OUTDOOR = 420;               // ppm baseline
 const CO2_EMISSION_LPS = 0.005;        // L/s per person (sedentary)
 const CO2_EMISSION_M3PS = CO2_EMISSION_LPS * 0.001;
-const ACH_CLOSED = 0.5;                // air changes/hour (infiltration)
-const ACH_OPEN = 3.0;                  // air changes/hour (windows open)
+const ACH_CLOSED = 1.8;                // air changes/hour (infiltration)
+const ACH_OPEN = 15.0;                 // air changes/hour (windows open)
 const SENSOR_NOISE_BASE = 1.2;         // ppm
 
 const POWER_LIGHTS = 280;           // W (lighting)
@@ -355,3 +355,73 @@ export const SCENARIOS: Scenario[] = [
     heatingOn: false,
   },
 ];
+
+// ===== GLOBAL STATE & SIMULATION MANAGER =====
+export let globalState = createInitialState();
+export let globalWsClient: WebSocket | null = null;
+let globalIntervalId: number | null = null;
+
+// Allow components to subscribe to simulation updates
+type Subscriber = (state: SimulationState) => void;
+const subscribers: Set<Subscriber> = new Set();
+
+export function subscribeToSimulation(cb: Subscriber): () => void {
+  subscribers.add(cb);
+  return () => subscribers.delete(cb);
+}
+
+export function startGlobalSimulation(): void {
+  if (globalIntervalId) return;
+  globalIntervalId = window.setInterval(() => {
+    globalState = tick(globalState, 5);
+    subscribers.forEach(cb => cb(globalState));
+  }, 1000);
+}
+
+// Function to trigger state spike explicitly from anywhere
+export function triggerSpike(): void {
+  globalState.co2 += 100;
+  globalState.power = globalState.powerThreshold + 1500;
+  // Trigger update immediately
+  subscribers.forEach(cb => cb(globalState));
+}
+
+export function connectGlobalESP(ip: string, onStatus: (status: 'connecting' | 'connected' | 'disconnected' | 'error') => void): void {
+  if (globalWsClient) {
+    globalWsClient.close();
+    globalWsClient = null;
+  }
+  
+  onStatus('connecting');
+  try {
+    const ws = new WebSocket(`ws://${ip}:81`);
+    
+    ws.onopen = () => onStatus('connected');
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(String(event.data));
+        if (data && data.action === 'spike') {
+          triggerSpike();
+        } else if (data && data.action === 'potentiometer' && typeof data.value === 'number') {
+          // Map potentiometer 0-100 to students 0-35
+          globalState.students = Math.round((data.value / 100) * 35);
+          subscribers.forEach(cb => cb(globalState));
+        }
+      } catch (e) {
+        console.warn('Invalid ESP8266 JSON');
+      }
+    };
+    
+    ws.onclose = () => {
+      onStatus('disconnected');
+      if (globalWsClient === ws) globalWsClient = null;
+    };
+    
+    ws.onerror = () => onStatus('error');
+    
+    globalWsClient = ws;
+  } catch(e) {
+    onStatus('error');
+  }
+}

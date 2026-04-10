@@ -1,9 +1,11 @@
-// ===== ZephyrusTech — Main Entry Point =====
 import './style.css';
-import { renderPresentation } from './pages/presentation';
+import { renderPresentation, destroyPresentation } from './pages/presentation';
 import { renderRoom3D, destroyRoom3D } from './pages/room3d';
+import { renderComponents } from './pages/components';
+import { renderArduino } from './pages/arduino';
+import { startGlobalSimulation } from './simulation';
 
-type Page = 'presentation' | 'simulation';
+type Page = 'presentation' | 'simulation' | 'components' | 'arduino';
 
 interface NavItem {
   id: Page;
@@ -14,39 +16,9 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'presentation', label: 'Presentazione', icon: 'campaign' },
   { id: 'simulation', label: 'Simulazione', icon: 'view_in_ar' },
+  { id: 'components', label: 'Componenti', icon: 'memory' },
+  { id: 'arduino', label: 'Arduino vs Custom', icon: 'compare' },
 ];
-
-const PRESENTATION_SECTION_HASHES = new Set([
-  'technical-compare',
-]);
-
-function normalizeHash(hash: string): string {
-  if (hash === 'components') return 'presentation';
-  if (hash === 'arduino') return 'technical-compare';
-  return hash;
-}
-
-function resolvePageFromHash(hash: string): Page | null {
-  const normalized = normalizeHash(hash);
-  if (normalized === 'simulation') return 'simulation';
-  if (!normalized || normalized === 'presentation' || PRESENTATION_SECTION_HASHES.has(normalized)) {
-    return 'presentation';
-  }
-  return null;
-}
-
-function syncPresentationAnchor(hash: string): void {
-  const normalized = normalizeHash(hash);
-  if (!PRESENTATION_SECTION_HASHES.has(normalized)) return;
-
-  if (normalized !== hash) {
-    window.history.replaceState(null, '', `#${normalized}`);
-  }
-
-  window.requestAnimationFrame(() => {
-    document.getElementById(normalized)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
-}
 
 let currentPage: Page = 'presentation';
 let warpRaf = 0;
@@ -128,9 +100,9 @@ function createApp(): void {
   });
 
   // Handle hash navigation
-  const resolvedPage = resolvePageFromHash(window.location.hash.slice(1));
-  if (resolvedPage) {
-    currentPage = resolvedPage;
+  const hash = window.location.hash.slice(1) as Page;
+  if (hash && NAV_ITEMS.some(n => n.id === hash)) {
+    currentPage = hash;
   }
 
   renderCurrentPage();
@@ -143,6 +115,8 @@ function navigateTo(page: Page): void {
   // Cleanup current page
   if (currentPage === 'simulation') {
     destroyRoom3D();
+  } else if (currentPage === 'presentation') {
+    destroyPresentation();
   }
 
   currentPage = page;
@@ -166,10 +140,15 @@ function renderCurrentPage(): void {
   switch (currentPage) {
     case 'presentation':
       renderPresentation(content);
-      syncPresentationAnchor(window.location.hash.slice(1));
       break;
     case 'simulation':
       renderRoom3D(content);
+      break;
+    case 'components':
+      renderComponents(content);
+      break;
+    case 'arduino':
+      renderArduino(content);
       break;
   }
 
@@ -178,24 +157,18 @@ function renderCurrentPage(): void {
 
 // Handle browser back/forward
 window.addEventListener('hashchange', () => {
-  const hash = window.location.hash.slice(1);
-  const resolvedPage = resolvePageFromHash(hash);
-  if (!resolvedPage) return;
-
-  if (resolvedPage !== currentPage) {
+  const hash = window.location.hash.slice(1) as Page;
+  if (hash && NAV_ITEMS.some(n => n.id === hash) && hash !== currentPage) {
     if (currentPage === 'simulation') destroyRoom3D();
-    currentPage = resolvedPage;
+    else if (currentPage === 'presentation') destroyPresentation();
+    currentPage = hash;
     document.querySelectorAll('.nav-link').forEach(link => {
-      link.classList.toggle('active', (link as HTMLElement).dataset.page === resolvedPage);
+      link.classList.toggle('active', (link as HTMLElement).dataset.page === hash);
     });
     renderCurrentPage();
-    return;
-  }
-
-  if (resolvedPage === 'presentation') {
-    syncPresentationAnchor(hash);
   }
 });
 
 // Initialize
+startGlobalSimulation();
 createApp();
